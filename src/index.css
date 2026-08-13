@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-body antialiased;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(27,27,31,0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+}
+
+/* 시그니처 요소: 출석/결석 도장 애니메이션 */
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: scale(2.4) rotate(-18deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.92) rotate(-10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-10deg);
+  }
+}
+
+.stamp-pop {
+  animation: stamp-in 380ms cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-pop {
+    animation: none;
+  }
+}
+
+.receipt-dash {
+  background-image: repeating-linear-gradient(
+    to right,
+    #C9C2AE 0,
+    #C9C2AE 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  height: 1px;
+}
