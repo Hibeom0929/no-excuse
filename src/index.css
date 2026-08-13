@@ -11,6 +11,9 @@
     background-image:
       radial-gradient(circle at 1px 1px, rgba(27,27,31,0.05) 1px, transparent 0);
     background-size: 22px 22px;
+    /* 홈 화면 앱으로 실행했을 때 아이폰 노치/상태바 영역과 콘텐츠가 겹치지 않도록 */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
