@@ -61,6 +61,7 @@ npm run dev
 2. https://vercel.com 에서 GitHub 저장소를 Import
 3. **Environment Variables** 에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` 를 똑같이 추가
 4. 배포 완료 후 나온 도메인을 Supabase의 **Site URL / Redirect URLs** 에도 추가해줘야 로그인이 정상 작동해요
+5. 휴대폰에서 배포 주소를 열면 설치 안내가 나타납니다. iPhone은 Safari 공유 버튼의 **홈 화면에 추가**, Android는 안내의 **홈 화면에 앱 추가**를 누르면 앱 아이콘으로 설치됩니다.
 
 ## 문제 해결
 

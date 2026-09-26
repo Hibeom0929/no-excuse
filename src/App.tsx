@@ -6,6 +6,7 @@ import Onboarding from './components/Onboarding'
 import GroupHome from './components/GroupHome'
 import GroupDashboard from './components/GroupDashboard'
 import ErrorBoundary from './components/ErrorBoundary'
+import InstallAppPrompt from './components/InstallAppPrompt'
 
 function Shell() {
   const [groupId, setGroupId] = useState<string | null>(null)
@@ -53,6 +54,7 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Gate />
+        <InstallAppPrompt />
       </AuthProvider>
     </ErrorBoundary>
   )
