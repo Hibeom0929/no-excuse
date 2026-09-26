@@ -18,12 +18,18 @@ interface Ctx {
   addTimetableEntry: (e: Omit<TimetableEntry, 'id'>) => Promise<void>
   updateTimetableEntry: (id: string, patch: Omit<TimetableEntry, 'id' | 'groupId' | 'memberId'>) => Promise<void>
   removeTimetableEntry: (id: string) => Promise<void>
+  restoreTimetableEntry: (id: string) => Promise<void>
   checkIn: (entry: TimetableEntry, photo?: string) => Promise<void>
   cancelCheckIn: (record: AttendanceRecord) => Promise<void>
   fileExcuse: (record: AttendanceRecord, reason: string) => Promise<void>
   castVote: (excuseId: string, voterMemberId: string, approve: boolean) => Promise<void>
   markFinesSettled: (memberId: string, groupId: string) => Promise<void>
   setTreasurer: (groupId: string, memberId: string) => Promise<void>
+  transferOwnership: (groupId: string, memberId: string) => Promise<void>
+  leaveGroup: (groupId: string) => Promise<void>
+  archiveGroup: (groupId: string) => Promise<void>
+  restoreGroup: (groupId: string) => Promise<void>
+  deleteGroup: (groupId: string, confirmationName: string) => Promise<void>
   processAutoAbsences: (group: Group) => Promise<void>
 }
 
@@ -41,7 +47,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const refreshAll = useCallback(async () => {
     if (!meId) { setData(EMPTY); setLoading(false); return }
 
-    const { data: myMemberships } = await supabase.from('group_members').select('group_id').eq('member_id', meId)
+    const { data: myMemberships } = await supabase.from('group_members').select('group_id').eq('member_id', meId).is('left_at', null)
     const groupIds = (myMemberships ?? []).map(m => m.group_id as string)
 
     if (groupIds.length === 0) {
@@ -50,7 +56,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     const [groupsRes, membersRes, ttRes, attRes, fineRes, excRes] = await Promise.all([
       supabase.from('groups').select('*').in('id', groupIds),
-      supabase.from('group_members').select('group_id, member_id, profiles ( id, name )').in('group_id', groupIds),
+      supabase.from('group_members').select('group_id, member_id, left_at, profiles ( id, name )').in('group_id', groupIds),
       supabase.from('timetable_entries').select('*').in('group_id', groupIds),
       supabase.from('attendance_records').select('*').in('group_id', groupIds),
       supabase.from('fine_transactions').select('*').in('group_id', groupIds),
@@ -61,7 +67,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     for (const row of membersRes.data ?? []) {
       const list = membersByGroup.get(row.group_id) ?? []
       const p = row.profiles as unknown as { id: string; name: string } | null
-      list.push({ id: row.member_id, name: p?.name?.trim() || '(이름 미설정)' })
+      list.push({ id: row.member_id, name: p?.name?.trim() || '(이름 미설정)', leftAt: row.left_at ?? undefined })
       membersByGroup.set(row.group_id, list)
     }
 
@@ -110,33 +116,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const createGroup = useCallback(async (name: string, fineAmount: number, currency: CurrencyCode, accountInfo: string, requirePhotoToCheckIn: boolean) => {
     if (!meId) throw new Error('로그인이 필요해요')
     const inviteCode = makeInviteCode()
-    const { data: inserted, error } = await supabase.from('groups').insert({
-      name, invite_code: inviteCode, fine_amount: fineAmount, currency,
-      account_info: accountInfo, require_photo: requirePhotoToCheckIn,
-      owner_id: meId, treasurer_id: meId,
-    }).select().single()
-    if (error || !inserted) throw new Error(error?.message ?? '그룹을 만들지 못했어요')
-
-    const { error: memErr } = await supabase.from('group_members').insert({ group_id: inserted.id, member_id: meId })
-    if (memErr) throw new Error(memErr.message)
+    const { data: groupId, error } = await supabase.rpc('create_group', {
+      p_name: name,
+      p_invite_code: inviteCode,
+      p_fine_amount: fineAmount,
+      p_currency: currency,
+      p_account_info: accountInfo,
+      p_require_photo: requirePhotoToCheckIn,
+    })
+    if (error || !groupId) throw new Error(error?.message ?? '그룹을 만들지 못했어요')
 
     await refreshAll()
-    return inserted.id as string
+    return groupId as string
   }, [meId, refreshAll])
 
   const joinGroup = useCallback(async (inviteCode: string) => {
-  if (!meId) throw new Error('로그인이 필요해요')
-  const { data: groupId, error } = await supabase.rpc('get_group_id_by_invite_code', {
-    code: inviteCode.trim().toUpperCase(),
-  })
-  if (error || !groupId) return null
+    if (!meId) throw new Error('로그인이 필요해요')
+    const { data: groupId, error } = await supabase.rpc('join_group_by_invite_code', {
+      p_invite_code: inviteCode.trim().toUpperCase(),
+    })
+    if (error) throw new Error(error.message)
+    if (!groupId) return null
 
-  const { error: memErr } = await supabase.from('group_members').insert({ group_id: groupId, member_id: meId })
-  if (memErr && !memErr.message.toLowerCase().includes('duplicate')) throw new Error(memErr.message)
-
-  await refreshAll()
-  return groupId as string
-}, [meId, refreshAll])
+    await refreshAll()
+    return groupId as string
+  }, [meId, refreshAll])
 
   const addTimetableEntry = useCallback(async (e: Omit<TimetableEntry, 'id'>) => {
     const { error } = await supabase.from('timetable_entries').insert({
@@ -157,7 +161,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [refreshAll])
 
   const removeTimetableEntry = useCallback(async (id: string) => {
-    const { error } = await supabase.from('timetable_entries').delete().eq('id', id)
+    const { error } = await supabase.from('timetable_entries').update({ archived_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
+  const restoreTimetableEntry = useCallback(async (id: string) => {
+    const { error } = await supabase.from('timetable_entries').update({ archived_at: null }).eq('id', id)
     if (error) throw new Error(error.message)
     await refreshAll()
   }, [refreshAll])
@@ -200,7 +210,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const { data: excuseRow } = await supabase.from('excuse_requests').select('*').eq('id', excuseId).single()
     if (!excuseRow || excuseRow.status !== 'pending') { await refreshAll(); return }
 
-    const { data: memberRows } = await supabase.from('group_members').select('member_id').eq('group_id', excuseRow.group_id)
+    const { data: memberRows } = await supabase.from('group_members').select('member_id').eq('group_id', excuseRow.group_id).is('left_at', null)
     const otherMemberIds = (memberRows ?? []).map(r => r.member_id as string).filter(id => id !== excuseRow.member_id)
     const totalVoters = otherMemberIds.length
 
@@ -238,7 +248,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [refreshAll])
 
   const setTreasurer = useCallback(async (groupId: string, memberId: string) => {
-    const { error } = await supabase.from('groups').update({ treasurer_id: memberId }).eq('id', groupId)
+    const { error } = await supabase.rpc('set_group_treasurer', { p_group_id: groupId, p_treasurer_id: memberId })
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
+  const transferOwnership = useCallback(async (groupId: string, memberId: string) => {
+    const { error } = await supabase.rpc('transfer_group_ownership', { p_group_id: groupId, p_new_owner_id: memberId })
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
+  const leaveGroup = useCallback(async (groupId: string) => {
+    const { error } = await supabase.rpc('leave_group', { p_group_id: groupId })
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
+  const archiveGroup = useCallback(async (groupId: string) => {
+    const { error } = await supabase.rpc('archive_group', { p_group_id: groupId })
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
+  const restoreGroup = useCallback(async (groupId: string) => {
+    const { error } = await supabase.rpc('restore_group', { p_group_id: groupId })
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
+  const deleteGroup = useCallback(async (groupId: string, confirmationName: string) => {
+    const { error } = await supabase.rpc('delete_group', { p_group_id: groupId, p_confirmation_name: confirmationName })
     if (error) throw new Error(error.message)
     await refreshAll()
   }, [refreshAll])
@@ -247,10 +287,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // (실 서비스라면 서버 스케줄러가 담당할 일이지만, 지금은 그룹원 중 누군가의 브라우저가
   //  열려있을 때 그 브라우저가 대신 처리한다 — DB의 unique 제약이 중복 처리를 막아줌)
   const processAutoAbsences = useCallback(async (group: Group) => {
+    if (group.archivedAt) return
     const date = todayDateStr()
     const wd = todayWeekday()
     const now = nowHHMM()
-    const todaysEntries = dataRef.current.timetable.filter(t => t.groupId === group.id && t.weekday === wd)
+    const todaysEntries = dataRef.current.timetable.filter(t => t.groupId === group.id && t.weekday === wd && !t.archivedAt)
     let changed = false
     for (const entry of todaysEntries) {
       if (!hasClassEnded(entry.endTime, now)) continue
@@ -272,8 +313,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   return (
     <StoreCtx.Provider value={{
       data, loading,
-      createGroup, joinGroup, addTimetableEntry, updateTimetableEntry, removeTimetableEntry,
-      checkIn, cancelCheckIn, fileExcuse, castVote, markFinesSettled, setTreasurer, processAutoAbsences,
+      createGroup, joinGroup, addTimetableEntry, updateTimetableEntry, removeTimetableEntry, restoreTimetableEntry,
+      checkIn, cancelCheckIn, fileExcuse, castVote, markFinesSettled, setTreasurer,
+      transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup, processAutoAbsences,
     }}>
       {children}
     </StoreCtx.Provider>

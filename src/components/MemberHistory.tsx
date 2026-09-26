@@ -24,7 +24,7 @@ export default function MemberHistory({
 }: { group: Group; member: Member; onClose: () => void }) {
   const { data } = useStore()
 
-  const myTimetable = data.timetable.filter(t => t.groupId === group.id && t.memberId === member.id)
+  const myTimetable = data.timetable.filter(t => t.groupId === group.id && t.memberId === member.id && !t.archivedAt)
   const records = data.attendance
     .filter(a => a.groupId === group.id && a.memberId === member.id)
     .sort((a, b) => b.date.localeCompare(a.date))

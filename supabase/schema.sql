@@ -1,6 +1,7 @@
 -- ============================================================
 -- 출첵벌금 (setlog-attendance) — Supabase 스키마
--- Supabase 대시보드 > SQL Editor 에서 이 파일 전체를 그대로 실행하세요.
+-- Supabase 대시보드 > SQL Editor 에서 이 파일을 실행한 뒤,
+-- supabase/migrations 폴더의 SQL도 파일명 순서대로 실행하세요.
 -- ============================================================
 
 create extension if not exists "pgcrypto";
@@ -37,7 +38,8 @@ create table if not exists groups (
   require_photo boolean not null default false,
   owner_id uuid not null references profiles(id),
   treasurer_id uuid not null references profiles(id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  archived_at timestamptz
 );
 
 -- ---------- group_members ----------
@@ -45,6 +47,7 @@ create table if not exists group_members (
   group_id uuid not null references groups(id) on delete cascade,
   member_id uuid not null references profiles(id) on delete cascade,
   joined_at timestamptz not null default now(),
+  left_at timestamptz,
   primary key (group_id, member_id)
 );
 
@@ -57,7 +60,8 @@ create table if not exists timetable_entries (
   location text,
   weekday int not null check (weekday between 0 and 6),
   start_time text not null,
-  end_time text not null
+  end_time text not null,
+  archived_at timestamptz
 );
 
 -- ---------- attendance_records ----------
@@ -124,7 +128,7 @@ create or replace function is_group_member(gid uuid)
 returns boolean as $$
   select exists (
     select 1 from group_members
-    where group_id = gid and member_id = auth.uid()
+    where group_id = gid and member_id = auth.uid() and left_at is null
   );
 $$ language sql security definer stable;
 

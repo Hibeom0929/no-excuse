@@ -6,7 +6,7 @@ import { WEEKDAY_LABEL } from '../lib/time'
 const WEEKDAYS: Weekday[] = [1, 2, 3, 4, 5]
 
 export default function TimetableEditor({ group, meId }: { group: Group; meId: string }) {
-  const { data, addTimetableEntry, updateTimetableEntry, removeTimetableEntry } = useStore()
+  const { data, addTimetableEntry, updateTimetableEntry, removeTimetableEntry, restoreTimetableEntry } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [subject, setSubject] = useState('')
   const [location, setLocation] = useState('')
@@ -17,6 +17,8 @@ export default function TimetableEditor({ group, meId }: { group: Group; meId: s
   const myEntries = data.timetable
     .filter(t => t.groupId === group.id && t.memberId === meId)
     .sort((a, b) => a.weekday - b.weekday || a.startTime.localeCompare(b.startTime))
+  const activeEntries = myEntries.filter(t => !t.archivedAt)
+  const archivedEntries = myEntries.filter(t => !!t.archivedAt)
 
   const me = group.members.find(m => m.id === meId)
 
@@ -92,14 +94,14 @@ export default function TimetableEditor({ group, meId }: { group: Group; meId: s
       </div>
 
       <div>
-        <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">등록된 수업 ({myEntries.length})</h2>
-        {myEntries.length === 0 ? (
+        <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">등록된 수업 ({activeEntries.length})</h2>
+        {activeEntries.length === 0 ? (
           <div className="bg-white border border-dashed border-line rounded-xl p-6 text-center text-sm text-ink/40">
             아직 등록한 수업이 없어요.
           </div>
         ) : (
           <div className="space-y-2">
-            {myEntries.map(entry => (
+            {activeEntries.map(entry => (
               <div key={entry.id} className={`bg-white border rounded-xl px-4 py-3 flex items-center justify-between ${editingId === entry.id ? 'border-campus' : 'border-line'}`}>
                 <div>
                   <div className="font-medium text-sm text-ink">
@@ -112,13 +114,38 @@ export default function TimetableEditor({ group, meId }: { group: Group; meId: s
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => startEdit(entry)} className="text-xs text-ink/40 hover:text-campus px-2 py-1">수정</button>
-                  <button onClick={() => { if (confirm('이 수업을 삭제할까요?')) removeTimetableEntry(entry.id).catch(err => alert(err instanceof Error ? err.message : '삭제하지 못했어요')) }} className="text-xs text-ink/30 hover:text-stamp px-2 py-1">삭제</button>
+                  <button onClick={() => { if (confirm('시간표에서 이 수업을 지울까요? 과거 출석과 벌금 기록은 그대로 보존돼요.')) removeTimetableEntry(entry.id).catch(err => alert(err instanceof Error ? err.message : '삭제하지 못했어요')) }} className="text-xs text-ink/30 hover:text-stamp px-2 py-1">삭제</button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {archivedEntries.length > 0 && (
+        <div>
+          <h2 className="text-xs font-bold text-ink/35 mb-3 tracking-wide">삭제한 수업 ({archivedEntries.length})</h2>
+          <div className="space-y-2">
+            {archivedEntries.map(entry => (
+              <div key={entry.id} className="bg-white/60 border border-line rounded-xl px-4 py-3 flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-sm text-ink/45">
+                    <span className="font-mono mr-2">{WEEKDAY_LABEL[entry.weekday]}</span>
+                    {entry.subject}
+                  </div>
+                  <div className="text-xs text-ink/30 font-mono mt-0.5">{entry.startTime}–{entry.endTime}</div>
+                </div>
+                <button
+                  onClick={() => restoreTimetableEntry(entry.id).catch(err => alert(err instanceof Error ? err.message : '복구하지 못했어요'))}
+                  className="text-xs font-bold text-campus/70 border border-campus/20 rounded-lg px-3 py-1.5 hover:bg-campus/5"
+                >
+                  복구
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

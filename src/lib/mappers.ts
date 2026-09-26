@@ -16,6 +16,7 @@ export function mapGroup(row: any, members: Member[]): Group {
     ownerId: row.owner_id,
     treasurerId: row.treasurer_id,
     createdAt: row.created_at,
+    archivedAt: row.archived_at ?? undefined,
   }
 }
 
@@ -29,6 +30,7 @@ export function mapTimetable(row: any): TimetableEntry {
     weekday: row.weekday,
     startTime: row.start_time,
     endTime: row.end_time,
+    archivedAt: row.archived_at ?? undefined,
   }
 }
 

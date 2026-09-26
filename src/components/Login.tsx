@@ -12,7 +12,8 @@ export default function Login() {
     <div className="max-w-sm mx-auto px-5 py-16 md:py-24">
       <p className="text-xs tracking-[0.2em] text-campus/70 font-mono uppercase mb-2">Attendance &amp; Fine Log</p>
       <h1 className="text-3xl font-black text-ink leading-tight mb-2">출첵벌금</h1>
-      <p className="text-sm text-ink/60 mb-8 leading-relaxed">이메일로 로그인하면 친구들과 같은 그룹을 실시간으로 공유할 수 있어요.</p>
+      <p className="text-sm text-ink/60 mb-2 leading-relaxed">이메일로 로그인하면 친구들과 같은 그룹을 실시간으로 공유할 수 있어요.</p>
+      <p className="text-xs text-ink/40 mb-8 leading-relaxed">처음 로그인하거나 직접 로그아웃한 경우에만 이메일 인증이 필요해요. 이 기기에서는 로그인 상태가 유지됩니다.</p>
 
       {sent ? (
         <div className="bg-campus/10 border border-campus/30 rounded-xl p-5 text-center">

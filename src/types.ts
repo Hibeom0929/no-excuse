@@ -1,6 +1,7 @@
 export interface Member {
   id: string
   name: string
+  leftAt?: string
 }
 
 export type CurrencyCode = 'KRW' | 'SGD' | 'USD' | 'JPY' | 'EUR' | 'GBP' | 'MYR' | 'CNY'
@@ -17,6 +18,7 @@ export interface Group {
   ownerId: string // 방장 (그룹을 만든 사람)
   treasurerId: string // 입금 확인 권한을 가진 사람 (기본값: 방장)
   createdAt: string
+  archivedAt?: string
 }
 
 // 0=일 1=월 2=화 3=수 4=목 5=금 6=토
@@ -31,6 +33,7 @@ export interface TimetableEntry {
   weekday: Weekday
   startTime: string // "09:00"
   endTime: string // "10:15"
+  archivedAt?: string
 }
 
 export type AttendanceStatus =
