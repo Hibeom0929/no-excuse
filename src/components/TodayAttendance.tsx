@@ -28,7 +28,7 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
   const now = nowHHMM()
 
   const myEntries = data.timetable
-    .filter(t => t.groupId === group.id && t.memberId === meId && t.weekday === wd)
+    .filter(t => t.groupId === group.id && t.memberId === meId && t.weekday === wd && !t.archivedAt)
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
 
   const findRecord = (entryId: string) =>
@@ -36,9 +36,9 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
 
   // 팀 전체 오늘 현황 (나 제외)
   const teamToday = group.members
-    .filter(m => m.id !== meId)
+    .filter(m => m.id !== meId && !m.leftAt)
     .map(m => {
-      const entries = data.timetable.filter(t => t.groupId === group.id && t.memberId === m.id && t.weekday === wd)
+      const entries = data.timetable.filter(t => t.groupId === group.id && t.memberId === m.id && t.weekday === wd && !t.archivedAt)
       return { member: m, entries }
     })
     .filter(x => x.entries.length > 0)

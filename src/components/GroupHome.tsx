@@ -8,6 +8,8 @@ export default function GroupHome({ onSelect }: { onSelect: (groupId: string) =>
   const [mode, setMode] = useState<'none' | 'create' | 'join'>('none')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const activeGroups = data.groups.filter(g => !g.archivedAt)
+  const archivedGroups = data.groups.filter(g => !!g.archivedAt)
 
   return (
     <div className="max-w-xl mx-auto px-5 py-10 md:py-16">
@@ -25,11 +27,11 @@ export default function GroupHome({ onSelect }: { onSelect: (groupId: string) =>
 
       {loading ? (
         <p className="text-sm text-ink/30 mb-8">불러오는 중...</p>
-      ) : data.groups.length > 0 && (
+      ) : activeGroups.length > 0 && (
         <div className="mb-8">
           <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">내 그룹</h2>
           <div className="space-y-2">
-            {data.groups.map(g => (
+            {activeGroups.map(g => (
               <button
                 key={g.id}
                 onClick={() => onSelect(g.id)}
@@ -38,10 +40,31 @@ export default function GroupHome({ onSelect }: { onSelect: (groupId: string) =>
                 <div>
                   <div className="font-bold text-ink">{g.name}</div>
                   <div className="text-xs text-ink/50 mt-0.5">
-                    멤버 {g.members.length}명 · 결석 {formatMoney(g.fineAmount, g.currency)}
+                    멤버 {g.members.filter(m => !m.leftAt).length}명 · 결석 {formatMoney(g.fineAmount, g.currency)}
                   </div>
                 </div>
                 <span className="text-campus/40 group-hover:text-campus transition-colors">→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && archivedGroups.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-xs font-bold text-ink/40 mb-3 tracking-wide">종료된 그룹</h2>
+          <div className="space-y-2">
+            {archivedGroups.map(g => (
+              <button
+                key={g.id}
+                onClick={() => onSelect(g.id)}
+                className="w-full text-left bg-white/60 border border-line rounded-xl px-4 py-3.5 hover:border-campus/30 transition-colors flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-bold text-ink/60">{g.name}</div>
+                  <div className="text-xs text-ink/35 mt-0.5">종료됨 · 기록 열람 가능</div>
+                </div>
+                <span className="text-ink/20">→</span>
               </button>
             ))}
           </div>

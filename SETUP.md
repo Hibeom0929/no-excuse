@@ -13,7 +13,11 @@
 
 1. 왼쪽 메뉴 **SQL Editor** 클릭 → "New query"
 2. 이 프로젝트의 `supabase/schema.sql` 파일 내용을 전체 복사해서 붙여넣기
-3. 오른쪽 아래 **Run** 클릭 → 에러 없이 끝나면 완료 (테이블, 보안 정책, 실시간 동기화가 한 번에 설정돼요)
+3. 오른쪽 아래 **Run** 클릭
+4. 이어서 `supabase/migrations` 폴더의 SQL 파일을 **파일명 순서대로** 하나씩 복사해 실행
+5. 모두 에러 없이 끝나면 완료 (테이블, 보안 정책, 실시간 동기화와 최신 기능이 설정돼요)
+
+> 이미 사용 중인 프로젝트라면 `schema.sql`을 다시 실행하지 말고, 아직 적용하지 않은 `supabase/migrations` 파일만 실행하세요. 실행 전에는 Database > Backups에서 백업을 먼저 만들어두는 것을 권장합니다.
 
 ## 3. 이메일 로그인(매직링크) 활성화 확인
 
@@ -27,8 +31,8 @@
 
 ## 4. 프로젝트 키 복사해서 .env.local 만들기
 
-1. 왼쪽 메뉴 **Settings > API**
-2. **Project URL** 과 **anon public** 키를 복사
+1. 프로젝트의 **Connect** 버튼 또는 **Settings > API Keys** 메뉴 열기
+2. **Project URL** 과 **Publishable key**를 복사
 3. 이 프로젝트 루트에서:
    ```bash
    cp .env.example .env.local
@@ -36,9 +40,9 @@
 4. `.env.local` 을 열어 값을 채워넣기:
    ```
    VITE_SUPABASE_URL=복사한 Project URL
-   VITE_SUPABASE_ANON_KEY=복사한 anon public 키
+   VITE_SUPABASE_PUBLISHABLE_KEY=복사한 Publishable key
    ```
-   (`.env.local` 은 `.gitignore`에 이미 포함되어 있어서 GitHub에는 올라가지 않아요 — anon key는 공개돼도 되는 키지만, 그래도 관례상 커밋하지 않아요)
+   (`.env.local` 은 `.gitignore`에 이미 포함되어 있어서 GitHub에는 올라가지 않아요. Publishable key는 브라우저용 키지만 관례상 커밋하지 않아요.)
 
 ## 5. 실행
 
@@ -55,8 +59,9 @@ npm run dev
 
 1. GitHub에 이 프로젝트를 올린다
 2. https://vercel.com 에서 GitHub 저장소를 Import
-3. **Environment Variables** 에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` 를 똑같이 추가
+3. **Environment Variables** 에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` 를 똑같이 추가
 4. 배포 완료 후 나온 도메인을 Supabase의 **Site URL / Redirect URLs** 에도 추가해줘야 로그인이 정상 작동해요
+5. 휴대폰에서 배포 주소를 열면 설치 안내가 나타납니다. iPhone은 Safari 공유 버튼의 **홈 화면에 추가**, Android는 안내의 **홈 화면에 앱 추가**를 누르면 앱 아이콘으로 설치됩니다.
 
 ## 문제 해결
 

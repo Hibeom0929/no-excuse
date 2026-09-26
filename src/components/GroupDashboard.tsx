@@ -30,20 +30,26 @@ export default function GroupDashboard({ groupId, onBack }: { groupId: string; o
     )
   }
 
+  const visibleTabs = group.archivedAt ? TABS.filter(t => t.key === 'ledger' || t.key === 'members') : TABS
+  const visibleTab: Tab = group.archivedAt && (tab === 'today' || tab === 'timetable') ? 'ledger' : tab
+
   return (
     <div className="max-w-xl mx-auto pb-24">
       <header className="sticky top-0 bg-paper/90 backdrop-blur z-10 px-5 pt-6 pb-3 border-b border-line">
         <div className="flex items-center justify-between mb-1">
           <button onClick={onBack} className="text-xs font-bold text-ink/40 hover:text-ink">← 그룹 목록</button>
         </div>
-        <h1 className="text-xl font-black text-ink">{group.name}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-black text-ink">{group.name}</h1>
+          {group.archivedAt && <span className="text-[10px] font-bold text-ink/40 bg-white border border-line rounded-full px-2 py-0.5">종료됨</span>}
+        </div>
         <nav className="flex gap-1 mt-4 -mx-1">
-          {TABS.map(t => (
+          {visibleTabs.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex-1 text-xs font-bold rounded-lg py-2 mx-1 transition-colors ${
-                tab === t.key ? 'bg-campus text-paper' : 'text-ink/50 hover:bg-white'
+                visibleTab === t.key ? 'bg-campus text-paper' : 'text-ink/50 hover:bg-white'
               }`}
             >
               {t.label}
@@ -53,12 +59,11 @@ export default function GroupDashboard({ groupId, onBack }: { groupId: string; o
       </header>
 
       <main className="px-5 pt-5">
-        {tab === 'today' && <TodayAttendance group={group} meId={meId} />}
-        {tab === 'timetable' && <TimetableEditor group={group} meId={meId} />}
-        {tab === 'ledger' && <Ledger group={group} meId={meId} />}
-        {tab === 'members' && <MembersPanel group={group} meId={meId} />}
+        {visibleTab === 'today' && <TodayAttendance group={group} meId={meId} />}
+        {visibleTab === 'timetable' && <TimetableEditor group={group} meId={meId} />}
+        {visibleTab === 'ledger' && <Ledger group={group} meId={meId} />}
+        {visibleTab === 'members' && <MembersPanel group={group} meId={meId} onExitGroup={onBack} />}
       </main>
     </div>
   )
 }
-
