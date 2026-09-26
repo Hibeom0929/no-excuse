@@ -11,7 +11,11 @@ interface AuthCtx {
   session: Session | null
   profile: Profile | null
   loading: boolean
-  sendMagicLink: (email: string) => Promise<{ error?: string }>
+  passwordRecovery: boolean
+  signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>
+  signUpWithPassword: (email: string, password: string) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>
+  requestPasswordReset: (email: string) => Promise<{ error?: string }>
+  updatePassword: (password: string) => Promise<{ error?: string }>
   updateName: (name: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
@@ -22,6 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [passwordRecovery, setPasswordRecovery] = useState(() => (
+    window.location.hash.includes('type=recovery')
+    || new URLSearchParams(window.location.search).get('type') === 'recovery'
+  ))
 
   const loadProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase.from('profiles').select('id, name').eq('id', userId).single()
@@ -35,8 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession)
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
       if (newSession) loadProfile(newSession.user.id)
       else setProfile(null)
     })
@@ -44,11 +53,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe()
   }, [loadProfile])
 
-  const sendMagicLink = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return { error: error?.message }
+  }, [])
+
+  const signUpWithPassword = useCallback(async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
       email,
+      password,
       options: { emailRedirectTo: window.location.origin },
     })
+    return { error: error?.message, needsEmailConfirmation: !error && !data.session }
+  }, [])
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    })
+    return { error: error?.message }
+  }, [])
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (!error) {
+      setPasswordRecovery(false)
+      await supabase.auth.signOut()
+    }
     return { error: error?.message }
   }, [])
 
@@ -64,7 +95,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <Ctx.Provider value={{ session, profile, loading, sendMagicLink, updateName, signOut }}>
+    <Ctx.Provider value={{
+      session, profile, loading, passwordRecovery,
+      signInWithPassword, signUpWithPassword, requestPasswordReset, updatePassword,
+      updateName, signOut,
+    }}>
       {children}
     </Ctx.Provider>
   )

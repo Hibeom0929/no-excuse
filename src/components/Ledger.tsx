@@ -1,11 +1,13 @@
 import React from 'react'
 import { useStore } from '../lib/store'
 import { Group } from '../types'
-import { formatDateKor } from '../lib/time'
+import { formatDate } from '../lib/time'
 import { formatMoney } from '../lib/currency'
+import { useLanguage } from '../lib/i18n'
 
 export default function Ledger({ group, meId }: { group: Group; meId: string }) {
   const { data, markFinesSettled } = useStore()
+  const { language, t } = useLanguage()
   const fines = data.fines.filter(f => f.groupId === group.id).sort((a, b) => b.date.localeCompare(a.date))
   const isTreasurer = meId === group.treasurerId
 
@@ -20,43 +22,46 @@ export default function Ledger({ group, meId }: { group: Group; meId: string }) 
 
   const totalPool = totals.reduce((s, t) => s + t.owed, 0)
   const totalAccumulated = totals.reduce((s, t) => s + t.accumulated, 0)
+  const localizedReason = (reason: string) => language === 'en'
+    ? reason.replace(/ 무단결석$/, ' absence')
+    : reason
 
   return (
     <div className="space-y-6">
       <div className="bg-campus text-paper rounded-xl p-5 shadow-card">
-        <p className="text-xs text-paper/60 font-mono uppercase tracking-wider">이번 학기 쌓인 벌금 총액</p>
+        <p className="text-xs text-paper/60 font-mono uppercase tracking-wider">{t('이번 학기 쌓인 벌금 총액')}</p>
         <p className="text-3xl font-black mt-1 font-mono">{formatMoney(totalAccumulated, group.currency)}</p>
         <div className="flex items-center justify-between mt-2">
-          <p className="text-[11px] text-paper/50">그중 미정산 금액</p>
+          <p className="text-[11px] text-paper/50">{t('그중 미정산 금액')}</p>
           <p className="text-xs font-mono text-paper/70">{formatMoney(totalPool, group.currency)}</p>
         </div>
         <div className="receipt-dash my-3 opacity-30" />
-        <p className="text-xs text-paper/70">입금 계좌 · {group.accountInfo}</p>
+        <p className="text-xs text-paper/70">{t('입금 계좌 · {{account}}', { account: group.accountInfo })}</p>
         {!isTreasurer && (
-          <p className="text-[11px] text-paper/50 mt-1">입금 확인은 총무({group.members.find(m => m.id === group.treasurerId)?.name})만 처리할 수 있어요.</p>
+          <p className="text-[11px] text-paper/50 mt-1">{t('입금 확인은 총무({{name}})만 처리할 수 있어요.', { name: group.members.find(m => m.id === group.treasurerId)?.name ?? '' })}</p>
         )}
       </div>
 
       <div>
-        <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">멤버별 벌금 현황</h2>
+        <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">{t('멤버별 벌금 현황')}</h2>
         <div className="bg-white border border-line rounded-xl divide-y divide-line">
           {totals.map(({ member, owed, accumulated, waived }) => (
             <div key={member.id} className="flex items-center justify-between px-4 py-3.5">
               <div>
-                <div className="text-sm font-bold text-ink">{member.name}{member.id === meId && <span className="text-ink/30 font-normal"> (나)</span>}</div>
+                <div className="text-sm font-bold text-ink">{member.name}{member.id === meId && <span className="text-ink/30 font-normal">{t(' (나)')}</span>}</div>
                 {owed > 0
-                  ? <div className="text-[11px] text-stamp/80 mt-0.5">미정산 {formatMoney(owed, group.currency)}</div>
-                  : <div className="text-[11px] text-campus/60 mt-0.5">미정산 없음</div>}
-                {waived > 0 && <div className="text-[11px] text-campus/70 mt-0.5">해명 승인 {waived}건 면제</div>}
+                  ? <div className="text-[11px] text-stamp/80 mt-0.5">{t('미정산 {{amount}}', { amount: formatMoney(owed, group.currency) })}</div>
+                  : <div className="text-[11px] text-campus/60 mt-0.5">{t('미정산 없음')}</div>}
+                {waived > 0 && <div className="text-[11px] text-campus/70 mt-0.5">{t('해명 승인 {{count}}건 면제', { count: waived })}</div>}
               </div>
               <div className="flex items-center gap-3">
                 <span className={`font-mono text-sm font-bold ${accumulated > 0 ? 'text-ink' : 'text-ink/30'}`}>{formatMoney(accumulated, group.currency)}</span>
                 {owed > 0 && isTreasurer && (
                   <button
-                    onClick={() => { if (confirm(`${member.name}님이 ${formatMoney(owed, group.currency)}를 입금했다고 확인할까요?`)) markFinesSettled(member.id, group.id).catch(err => alert(err instanceof Error ? err.message : '처리하지 못했어요')) }}
+                    onClick={() => { if (confirm(t('{{name}}님이 {{amount}}를 입금했다고 확인할까요?', { name: member.name, amount: formatMoney(owed, group.currency) }))) markFinesSettled(member.id, group.id).catch(err => alert(err instanceof Error ? err.message : t('처리하지 못했어요'))) }}
                     className="text-[11px] font-bold text-ink/40 border border-line rounded-full px-2.5 py-1 hover:border-campus hover:text-campus"
                   >
-                    입금 확인
+                    {t('입금 확인')}
                   </button>
                 )}
               </div>
@@ -66,10 +71,10 @@ export default function Ledger({ group, meId }: { group: Group; meId: string }) 
       </div>
 
       <div>
-        <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">전체 내역</h2>
+        <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">{t('전체 내역')}</h2>
         {fines.length === 0 ? (
           <div className="bg-white border border-dashed border-line rounded-xl p-6 text-center text-sm text-ink/40">
-            아직 벌금 내역이 없어요. 좋은 신호예요!
+            {t('아직 벌금 내역이 없어요. 좋은 신호예요!')}
           </div>
         ) : (
           <div className="bg-white border border-line rounded-xl p-4 font-mono text-xs">
@@ -79,15 +84,15 @@ export default function Ledger({ group, meId }: { group: Group; meId: string }) 
                 <div key={f.id}>
                   <div className="flex items-center justify-between py-2">
                     <div className="text-ink/70">
-                      <div>{formatDateKor(f.date)} · {member?.name}</div>
-                      <div className="text-ink/40">{f.reason}</div>
+                      <div>{formatDate(f.date, language)} · {member?.name}</div>
+                      <div className="text-ink/40">{localizedReason(f.reason)}</div>
                     </div>
                     <div className="text-right">
                       <div className={f.status === 'waived' ? 'text-ink/30 line-through' : f.settled ? 'text-campus' : 'text-stamp'}>
                         {formatMoney(f.amount, group.currency)}
                       </div>
                       <div className="text-[10px] text-ink/30">
-                        {f.status === 'waived' ? '면제됨' : f.settled ? '정산완료' : '미정산'}
+                        {f.status === 'waived' ? t('면제됨') : f.settled ? t('정산완료') : t('미정산')}
                       </div>
                     </div>
                   </div>

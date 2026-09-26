@@ -1,0 +1,238 @@
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+
+export type Language = 'ko' | 'en'
+type Variables = Record<string, string | number>
+
+const EN: Record<string, string> = {
+  '불러오는 중...': 'Loading...',
+  '로그아웃': 'Sign out',
+  '한국어': 'Korean',
+  '영어': 'English',
+  '학교 이메일 또는 자주 쓰는 이메일': 'School email or any email you use',
+  '이메일과 비밀번호로 로그인하면 친구들과 같은 그룹을 실시간으로 공유할 수 있어요.': 'Sign in with your email and password to share groups with your friends in real time.',
+  '한 번 로그인하면 이 기기에서 로그인 상태가 유지됩니다.': 'Once signed in, this device will keep you signed in.',
+  '로그인': 'Sign in',
+  '처음 가입': 'Create account',
+  '비밀번호 (6자리 이상)': 'Password (6+ characters)',
+  '비밀번호 한 번 더 입력': 'Enter password again',
+  '비밀번호는 6자리 이상으로 만들어주세요.': 'Use at least 6 characters for your password.',
+  '비밀번호가 서로 다릅니다.': 'The passwords do not match.',
+  '계정 만들기': 'Create account',
+  '확인 메일을 보냈어요. 메일의 링크를 한 번 누른 뒤 이 앱으로 돌아와 로그인하세요.': 'We sent a confirmation email. Open the link once, then return to this app and sign in.',
+  '먼저 이메일을 입력해주세요.': 'Enter your email first.',
+  '비밀번호 설정 메일을 보냈어요. 메일의 링크에서 새 비밀번호를 만들어주세요.': 'We sent a password setup email. Open the link to create a new password.',
+  '비밀번호 만들기 / 재설정': 'Create / reset password',
+  '새 비밀번호 만들기': 'Create a new password',
+  '새 비밀번호를 저장한 뒤 홈 화면의 No Excuse 앱으로 돌아가 로그인하세요.': 'Save your new password, then return to the No Excuse app on your home screen and sign in.',
+  '새 비밀번호 (6자리 이상)': 'New password (6+ characters)',
+  '비밀번호 저장': 'Save password',
+  '이메일 또는 비밀번호가 맞지 않아요.': 'The email or password is incorrect.',
+  '먼저 이메일로 보낸 확인 링크를 눌러주세요.': 'Open the confirmation link we sent to your email first.',
+  '이미 가입된 이메일이에요. 로그인하거나 비밀번호를 재설정해주세요.': 'This email is already registered. Sign in or reset the password.',
+  '거의 다 됐어요!': 'Almost there!',
+  '그룹 친구들에게 표시될 이름을 알려주세요.': 'Choose the name your group will see.',
+  '예) 김민준': 'e.g. Alex Kim',
+  '저장중...': 'Saving...',
+  '시작하기': 'Get started',
+  '문제가 생겼어요': 'Something went wrong',
+  '화면을 표시하는 중 오류가 발생했어요. 새로고침하면 대부분 해결돼요.': 'An error occurred while displaying this screen. Refreshing usually fixes it.',
+  '새로고침': 'Refresh',
+  '내 그룹': 'My groups',
+  '종료된 그룹': 'Archived groups',
+  '종료됨 · 기록 열람 가능': 'Archived · Records available',
+  '멤버 {{count}}명 · 결석 {{amount}}': '{{count}} members · Absence {{amount}}',
+  '+ 새 그룹 만들기': '+ Create a group',
+  '초대코드로 참여': 'Join with invite code',
+  '그룹 이름': 'Group name',
+  '예) 경영학과 25학번 출첵방': 'e.g. Study Crew 2026',
+  '벌금 화폐': 'Fine currency',
+  '결석 1회당 벌금': 'Fine per absence',
+  '벌금 모으는 계좌': 'Fine payment account',
+  '예) 카카오뱅크 3333-01-1234567 (총무 김민준)': 'e.g. Bank 123-456-789 (Treasurer Alex)',
+  '* 실제 자동이체는 지원하지 않아요. 벌금은 장부에 자동 기록되고, 이 계좌로 입금 후 정산 처리하는 방식이에요.': '* No automatic transfers. Fines are logged automatically and marked settled after payment to this account.',
+  '인증샷 필수로 하기': 'Require a photo',
+  '켜면 사진을 첨부해야만 출석 체크를 할 수 있어요.': 'Members must attach a photo to check in.',
+  '취소': 'Cancel',
+  '만드는 중...': 'Creating...',
+  '그룹 만들기': 'Create group',
+  '초대코드': 'Invite code',
+  '예) X7K2Q9': 'e.g. X7K2Q9',
+  '참여하는 중...': 'Joining...',
+  '참여하기': 'Join',
+  '그룹을 만들지 못했어요': 'Could not create the group.',
+  '초대코드를 확인해주세요.': 'Check the invite code.',
+  '참여하지 못했어요': 'Could not join the group.',
+  '오늘 출석': 'Today',
+  '시간표': 'Schedule',
+  '장부': 'Ledger',
+  '멤버': 'Members',
+  '그룹을 찾을 수 없어요.': 'Group not found.',
+  '돌아가기': 'Go back',
+  '← 그룹 목록': '← Groups',
+  '종료됨': 'Archived',
+  '오늘 · {{weekday}} · {{time}}': 'Today · {{weekday}} · {{time}}',
+  '오늘은 등록된 내 수업이 없어요.': 'You have no classes scheduled today.',
+  '해명 승인됨': 'Excuse approved',
+  '해명 반려됨': 'Excuse rejected',
+  '수업 시작 10분 전부터 출석 도장을 찍을 수 있어요.': 'Check-in opens 10 minutes before class.',
+  '{{time}} 체크인': 'Checked in at {{time}}',
+  '출석 체크를 취소할까요?': 'Cancel this check-in?',
+  '체크 취소': 'Cancel check-in',
+  '벌금 {{amount}} 부과됨': 'Fine charged: {{amount}}',
+  '해명하기': 'Submit excuse',
+  '🗳 내 투표가 필요해요': '🗳 Your vote is needed',
+  '수업': 'Class',
+  '우리 팀 오늘 현황': "Today's group status",
+  '{{name}}님이 {{subject}} 결석 해명을 요청했어요': '{{name}} requested an excuse for missing {{subject}}.',
+  '반려': 'Reject',
+  '인정': 'Approve',
+  '투표에 실패했어요': 'Could not submit the vote.',
+  '체크인에 실패했어요': 'Check-in failed.',
+  '출석': 'Present',
+  '결석': 'Absent',
+  '해명중': 'Pending',
+  '출석 완료!': 'Checked in!',
+  '인증샷': 'Photo proof',
+  '필수': 'Required',
+  '선택': 'Optional',
+  '처리중...': 'Processing...',
+  '📷 인증샷{{required}}': '📷 Photo{{required}}',
+  ' (필수)': ' (required)',
+  '사진 처리중...': 'Processing photo...',
+  '출석 도장 찍기': 'Check in',
+  '사진을 처리하지 못했어요. 다시 시도해주세요.': 'Could not process the photo. Try again.',
+  '결석 해명하기': 'Explain absence',
+  '사유를 적으면 팀원들의 투표로 벌금 면제 여부가 결정돼요. 과반수가 인정하면 벌금이 면제돼요.': 'Your group will vote on the reason. The fine is waived if a majority approves.',
+  '예) 갑자기 몸살이 나서 병원에 다녀왔어요. 진료 확인서 있어요.': 'e.g. I was sick and went to the clinic. I can provide documentation.',
+  '해명 제출하고 투표 요청': 'Submit and request vote',
+  '해명 제출에 실패했어요': 'Could not submit the excuse.',
+  '{{name}}님의 시간표 {{mode}}': "{{name}}'s schedule · {{mode}}",
+  '등록': 'Add',
+  '수정': 'Edit',
+  '수업명 (예: 경영통계학)': 'Class name (e.g. Statistics)',
+  '강의실 (선택)': 'Location (optional)',
+  '수정 완료': 'Save changes',
+  '+ 시간표에 추가': '+ Add to schedule',
+  '등록된 수업 ({{count}})': 'Classes ({{count}})',
+  '아직 등록한 수업이 없어요.': 'No classes added yet.',
+  '시간표에서 이 수업을 지울까요? 과거 출석과 벌금 기록은 그대로 보존돼요.': 'Remove this class? Past attendance and fine records will be kept.',
+  '삭제': 'Remove',
+  '삭제하지 못했어요': 'Could not remove it.',
+  '삭제한 수업 ({{count}})': 'Removed classes ({{count}})',
+  '복구': 'Restore',
+  '복구하지 못했어요': 'Could not restore it.',
+  '저장하지 못했어요': 'Could not save it.',
+  '이번 학기 쌓인 벌금 총액': 'Total fines this term',
+  '그중 미정산 금액': 'Outstanding',
+  '입금 계좌 · {{account}}': 'Payment account · {{account}}',
+  '입금 확인은 총무({{name}})만 처리할 수 있어요.': 'Only the treasurer ({{name}}) can confirm payments.',
+  '멤버별 벌금 현황': 'Fines by member',
+  ' (나)': ' (me)',
+  '미정산 {{amount}}': 'Outstanding {{amount}}',
+  '미정산 없음': 'Nothing outstanding',
+  '해명 승인 {{count}}건 면제': '{{count}} excused',
+  '{{name}}님이 {{amount}}를 입금했다고 확인할까요?': 'Confirm that {{name}} paid {{amount}}?',
+  '입금 확인': 'Confirm payment',
+  '처리하지 못했어요': 'Could not complete the request.',
+  '전체 내역': 'All transactions',
+  '아직 벌금 내역이 없어요. 좋은 신호예요!': 'No fines yet. That is a good sign!',
+  '면제됨': 'Waived',
+  '정산완료': 'Settled',
+  '미정산': 'Outstanding',
+  '읽기 전용': 'Read only',
+  '등록 수업 {{classes}}개 · 출석 {{present}} · 결석 {{absent}}': '{{classes}} classes · {{present}} present · {{absent}} absent',
+  '아직 출석 기록이 없어요.': 'No attendance records yet.',
+  '(삭제된 수업)': '(Removed class)',
+  '해명 투표중': 'Vote pending',
+  '해명 승인': 'Excuse approved',
+  '해명 반려': 'Excuse rejected',
+  '닫기': 'Close',
+  '복사': 'Copy',
+  '종료된 그룹에는 새 멤버가 참여할 수 없어요.': 'New members cannot join an archived group.',
+  '이 코드를 친구들에게 공유해서 그룹에 초대하세요.': 'Share this code to invite friends.',
+  '벌금 계좌': 'Payment account',
+  '입금 확인 담당(총무)': 'Treasurer',
+  '멤버 ({{count}})': 'Members ({{count}})',
+  '방장': 'Owner',
+  '총무': 'Treasurer',
+  '출석 보기 →': 'View attendance →',
+  '나간 멤버': 'Former members',
+  '기록 보기 →': 'View records →',
+  '💰 총무(입금 확인 담당) 지정': '💰 Choose treasurer',
+  '방장만 바꿀 수 있어요. 지정된 사람만 장부에서 입금 확인을 눌러 정산 처리를 할 수 있어요.': 'Only the owner can change this. The selected member can confirm payments in the ledger.',
+  '변경하지 못했어요': 'Could not make the change.',
+  '👑 그룹장 위임': '👑 Transfer ownership',
+  '그룹을 나가려면 먼저 다른 멤버에게 그룹장을 넘겨야 해요. 위임 후에는 되돌리려면 새 그룹장의 동의가 필요해요.': 'Transfer ownership before leaving. Only the new owner can transfer it back.',
+  '{{name}}님에게 그룹장을 넘길까요?': 'Transfer ownership to {{name}}?',
+  '{{name}}에게 위임': 'Transfer to {{name}}',
+  '그룹 관리': 'Group management',
+  '그룹 다시 열기': 'Restore group',
+  '그룹을 종료할까요? 출석과 시간표 등록은 멈추지만 기존 기록은 그대로 남아요.': 'Archive this group? Check-ins and schedule changes will stop, but records will remain.',
+  '그룹 종료하기': 'Archive group',
+  '그룹과 모든 기록을 영구 삭제하려면 그룹 이름을 입력해주세요.': 'Enter the group name to permanently delete the group and all records.',
+  '그룹 이름이 일치하지 않아 삭제하지 않았어요.': 'The group name did not match. Nothing was deleted.',
+  '그룹과 모든 기록 영구 삭제': 'Permanently delete group and records',
+  '영구 삭제는 출석, 벌금, 해명 기록까지 지우며 되돌릴 수 없어요.': 'Permanent deletion removes attendance, fines, and excuses and cannot be undone.',
+  '이 그룹에서 나갈까요? 과거 기록은 그룹 장부에 남고, 같은 초대코드로 다시 참여할 수 있어요.': 'Leave this group? Past records will remain, and you can rejoin with the same invite code.',
+  '그룹 나가기': 'Leave group',
+  '나가면 이 그룹을 더 이상 볼 수 없지만 기존 출석과 벌금 기록은 보존돼요.': 'You will no longer see this group, but past attendance and fine records will remain.',
+  'No Excuse를 앱처럼 열어보세요': 'Open No Excuse like an app',
+  '홈 화면 아이콘으로 바로 접속하고 전체 화면으로 사용할 수 있어요.': 'Launch from your home screen and use it full screen.',
+  '설치 안내 닫기': 'Dismiss install prompt',
+  'Safari 아래쪽의 공유 버튼(□↑)을 누른 뒤': 'Tap the Share button (□↑) at the bottom of Safari, then',
+  '‘홈 화면에 추가’ → ‘추가’를 선택하세요.': 'choose “Add to Home Screen” → “Add”.',
+  '브라우저 오른쪽 위의 메뉴(⋮)를 누른 뒤': 'Open the browser menu (⋮), then',
+  '‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택하세요.': 'choose “Install app” or “Add to Home screen”.',
+  'iPhone 설치 방법 보기': 'How to install on iPhone',
+  '홈 화면에 앱 추가': 'Add app to Home screen',
+  '설치 방법 보기': 'Installation steps',
+}
+
+function interpolate(template: string, variables: Variables = {}) {
+  return Object.entries(variables).reduce(
+    (result, [key, value]) => result.split(`{{${key}}}`).join(String(value)),
+    template,
+  )
+}
+
+interface LanguageContextValue {
+  language: Language
+  setLanguage: (language: Language) => void
+  t: (korean: string, variables?: Variables) => string
+}
+
+const LanguageContext = createContext<LanguageContextValue | null>(null)
+
+function initialLanguage(): Language {
+  const saved = window.localStorage.getItem('no-excuse-language')
+  if (saved === 'ko' || saved === 'en') return saved
+  return navigator.language.toLowerCase().startsWith('ko') ? 'ko' : 'en'
+}
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(initialLanguage)
+
+  const setLanguage = (next: Language) => {
+    window.localStorage.setItem('no-excuse-language', next)
+    setLanguageState(next)
+  }
+
+  useEffect(() => {
+    document.documentElement.lang = language
+    document.title = language === 'ko' ? 'No Excuse · 출석 및 벌금 관리' : 'No Excuse · Attendance & Fine Tracker'
+  }, [language])
+
+  const value = useMemo<LanguageContextValue>(() => ({
+    language,
+    setLanguage,
+    t: (korean, variables) => interpolate(language === 'ko' ? korean : (EN[korean] ?? korean), variables),
+  }), [language])
+
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
+}
+
+export function useLanguage() {
+  const context = useContext(LanguageContext)
+  if (!context) throw new Error('useLanguage must be used within LanguageProvider')
+  return context
+}

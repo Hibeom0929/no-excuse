@@ -19,13 +19,15 @@
 
 > 이미 사용 중인 프로젝트라면 `schema.sql`을 다시 실행하지 말고, 아직 적용하지 않은 `supabase/migrations` 파일만 실행하세요. 실행 전에는 Database > Backups에서 백업을 먼저 만들어두는 것을 권장합니다.
 
-## 3. 이메일 로그인(매직링크) 활성화 확인
+## 3. 이메일 + 비밀번호 로그인 설정
 
-1. 왼쪽 메뉴 **Authentication > Providers** 에서 **Email**이 켜져 있는지 확인 (기본값이 켜짐이에요)
-2. **Authentication > URL Configuration** 에서:
-   - **Site URL**: 배포하면 실제 도메인(예: `https://내프로젝트.vercel.app`), 로컬 개발만 할 거면 `http://localhost:5173`
-   - **Redirect URLs**: `http://localhost:5173` 를 추가 (배포 후에는 배포 도메인도 추가)
-3. (선택) **Authentication > Email Templates** 에서 매직링크 메일 문구를 한글로 바꿀 수 있어요
+1. 왼쪽 메뉴 **Authentication > Sign In / Providers**에서 **Email**이 켜져 있는지 확인합니다.
+2. 소규모 친구 그룹이고 Supabase 기본 메일 제한을 피하려면 **Confirm email**을 끕니다. 그러면 메일 발송 없이 앱 안에서 바로 가입됩니다. 이메일 소유 확인이 필요한 서비스라면 켜두세요.
+3. **Authentication > URL Configuration**에서:
+   - **Site URL**: 배포 주소(예: `https://내프로젝트.vercel.app`)
+   - **Redirect URLs**: `http://localhost:5173`과 배포 주소를 모두 추가
+
+> 커스텀 SMTP나 메일 템플릿 수정은 필요하지 않아요. Confirm email을 끔 경우 Supabase 기본 메일은 비밀번호 재설정할 때만 사용합니다.
 
 > 참고: Supabase 무료 플랜은 자체 이메일 발송에 시간당 발송 제한이 있어요. 친구 여러 명이 동시에 테스트하다 "이메일이 안 와요" 하면, 이 제한에 걸렸을 가능성이 커요. 나중에 실제로 여러 명이 쓰게 되면 **Authentication > Providers > Email > SMTP Settings**에서 본인 이메일(Gmail 등)이나 Resend 같은 서비스로 직접 발송 설정을 해주는 게 좋아요.
 
@@ -51,7 +53,7 @@ npm install
 npm run dev
 ```
 
-브라우저에서 `http://localhost:5173` 접속 → 이메일 입력 → 받은 메일의 링크 클릭 → 이름 입력 → 그룹 생성/참여!
+브라우저에서 `http://localhost:5173` 접속 → **처음 가입** → 이메일과 비밀번호 입력 → 로그인 → 그룹 생성/참여! Confirm email을 켜두었다면 처음 가입 중에 확인 메일 단계가 추가됩니다.
 
 친구도 똑같이 이 프로젝트를 받아서 **같은 .env.local 값**(같은 Supabase 프로젝트)으로 실행하면, 서로 다른 기기에서도 같은 그룹을 실시간으로 공유하게 돼요.
 

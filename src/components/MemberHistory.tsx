@@ -1,15 +1,8 @@
 import React from 'react'
 import { useStore } from '../lib/store'
 import { Group, Member } from '../types'
-import { WEEKDAY_LABEL, formatDateKor } from '../lib/time'
-
-const STATUS_LABEL: Record<string, string> = {
-  present: '출석',
-  absent: '결석',
-  excused_pending: '해명 투표중',
-  excused_approved: '해명 승인',
-  excused_rejected: '해명 반려',
-}
+import { weekdayLabel, formatDate } from '../lib/time'
+import { useLanguage } from '../lib/i18n'
 
 const STATUS_COLOR: Record<string, string> = {
   present: 'text-campus bg-campus/10',
@@ -23,6 +16,11 @@ export default function MemberHistory({
   group, member, onClose,
 }: { group: Group; member: Member; onClose: () => void }) {
   const { data } = useStore()
+  const { language, t } = useLanguage()
+  const statusLabel: Record<string, string> = {
+    present: t('출석'), absent: t('결석'), excused_pending: t('해명 투표중'),
+    excused_approved: t('해명 승인'), excused_rejected: t('해명 반려'),
+  }
 
   const myTimetable = data.timetable.filter(t => t.groupId === group.id && t.memberId === member.id && !t.archivedAt)
   const records = data.attendance
@@ -38,12 +36,12 @@ export default function MemberHistory({
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-bold text-ink text-lg">{member.name}</h3>
-          <span className="text-[10px] font-bold text-ink/30 bg-paper rounded-full px-2 py-1">읽기 전용</span>
+          <span className="text-[10px] font-bold text-ink/30 bg-paper rounded-full px-2 py-1">{t('읽기 전용')}</span>
         </div>
-        <p className="text-xs text-ink/40 mb-4">등록 수업 {myTimetable.length}개 · 출석 {presentCount} · 결석 {absentCount}</p>
+        <p className="text-xs text-ink/40 mb-4">{t('등록 수업 {{classes}}개 · 출석 {{present}} · 결석 {{absent}}', { classes: myTimetable.length, present: presentCount, absent: absentCount })}</p>
 
         {records.length === 0 ? (
-          <div className="bg-paper rounded-xl p-6 text-center text-sm text-ink/40">아직 출석 기록이 없어요.</div>
+          <div className="bg-paper rounded-xl p-6 text-center text-sm text-ink/40">{t('아직 출석 기록이 없어요.')}</div>
         ) : (
           <div className="space-y-2">
             {records.map(r => {
@@ -51,13 +49,13 @@ export default function MemberHistory({
               return (
                 <div key={r.id} className="flex items-center justify-between bg-paper rounded-lg px-3 py-2.5">
                   <div className="text-sm">
-                    <div className="font-medium text-ink">{entry?.subject ?? '(삭제된 수업)'}</div>
+                    <div className="font-medium text-ink">{entry?.subject ?? t('(삭제된 수업)')}</div>
                     <div className="text-[11px] text-ink/40 font-mono">
-                      {formatDateKor(r.date)}{entry ? ` · ${WEEKDAY_LABEL[entry.weekday]}요일 ${entry.startTime}` : ''}
+                      {formatDate(r.date, language)}{entry ? ` · ${weekdayLabel(entry.weekday, language)} ${entry.startTime}` : ''}
                     </div>
                   </div>
                   <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 ${STATUS_COLOR[r.status]}`}>
-                    {STATUS_LABEL[r.status]}
+                    {statusLabel[r.status]}
                   </span>
                 </div>
               )
@@ -65,7 +63,7 @@ export default function MemberHistory({
           </div>
         )}
 
-        <button onClick={onClose} className="w-full mt-4 rounded-lg py-2.5 text-sm font-bold text-ink/50 hover:bg-paper">닫기</button>
+        <button onClick={onClose} className="w-full mt-4 rounded-lg py-2.5 text-sm font-bold text-ink/50 hover:bg-paper">{t('닫기')}</button>
       </div>
     </div>
   )

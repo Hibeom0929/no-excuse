@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { compressImageFile } from '../lib/image'
+import { useLanguage } from '../lib/i18n'
 
 export function StampMark({ kind }: { kind: 'present' | 'absent' | 'excused' }) {
-  const label = kind === 'present' ? '출석' : kind === 'absent' ? '결석' : '해명중'
+  const { t } = useLanguage()
+  const label = kind === 'present' ? t('출석') : kind === 'absent' ? t('결석') : t('해명중')
   const color = kind === 'present' ? 'border-campus text-campus' : kind === 'absent' ? 'border-stamp text-stamp' : 'border-gold text-gold'
   return (
     <span
@@ -20,6 +22,7 @@ export function CheckInStamp({
   onConfirm: (photo?: string) => void
   requirePhoto: boolean
 }) {
+  const { t } = useLanguage()
   const [photo, setPhoto] = useState<string | undefined>(undefined)
   const [stamped, setStamped] = useState(false)
   const [loadingPhoto, setLoadingPhoto] = useState(false)
@@ -34,7 +37,7 @@ export function CheckInStamp({
       const compressed = await compressImageFile(file)
       setPhoto(compressed)
     } catch {
-      setPhotoError('사진을 처리하지 못했어요. 다시 시도해주세요.')
+      setPhotoError(t('사진을 처리하지 못했어요. 다시 시도해주세요.'))
     } finally {
       setLoadingPhoto(false)
     }
@@ -44,7 +47,7 @@ export function CheckInStamp({
     return (
       <div className="flex flex-col items-center gap-2 py-2">
         <StampMark kind="present" />
-        <span className="text-xs text-campus font-bold">출석 완료!</span>
+        <span className="text-xs text-campus font-bold">{t('출석 완료!')}</span>
       </div>
     )
   }
@@ -55,12 +58,12 @@ export function CheckInStamp({
     <div className="space-y-1.5">
       <div className="flex items-center gap-2">
         {photo && (
-          <img src={photo} alt="인증샷" className="w-11 h-11 rounded-lg object-cover border border-line" />
+          <img src={photo} alt={t('인증샷')} className="w-11 h-11 rounded-lg object-cover border border-line" />
         )}
         <label className={`cursor-pointer text-xs font-bold rounded-lg px-2.5 py-2 whitespace-nowrap border ${
           requirePhoto && !photo ? 'border-gold text-gold' : 'border-line text-ink/50 hover:border-campus/40'
         }`}>
-          {loadingPhoto ? '처리중...' : `📷 인증샷${requirePhoto ? ' (필수)' : ''}`}
+          {loadingPhoto ? t('처리중...') : t('📷 인증샷{{required}}', { required: requirePhoto ? t(' (필수)') : '' })}
           <input type="file" accept="image/*" capture="environment" className="hidden" disabled={loadingPhoto}
             onChange={e => handleFile(e.target.files?.[0])} />
         </label>
@@ -69,7 +72,7 @@ export function CheckInStamp({
           disabled={!canConfirm}
           className="flex-1 bg-campus text-paper font-bold text-sm rounded-lg py-2.5 hover:bg-campusLight transition-colors disabled:bg-line disabled:text-ink/30 disabled:cursor-not-allowed"
         >
-          {loadingPhoto ? '사진 처리중...' : '출석 도장 찍기'}
+          {loadingPhoto ? t('사진 처리중...') : t('출석 도장 찍기')}
         </button>
       </div>
       {photoError && <p className="text-[11px] text-stamp">{photoError}</p>}
