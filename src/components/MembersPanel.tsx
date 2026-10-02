@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useStore } from '../lib/store'
 import { Group, Member } from '../types'
 import { formatMoney } from '../lib/currency'
@@ -9,15 +9,18 @@ export default function MembersPanel({
   group, meId, onExitGroup,
 }: { group: Group; meId: string; onExitGroup: () => void }) {
   const {
-    setTreasurer, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup,
+    setTreasurer, renameGroup, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup,
   } = useStore()
   const { t } = useLanguage()
   const [viewingMember, setViewingMember] = useState<Member | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [groupName, setGroupName] = useState(group.name)
   const isOwner = meId === group.ownerId
   const activeMembers = group.members.filter(m => !m.leftAt)
   const formerMembers = group.members.filter(m => !!m.leftAt)
+
+  useEffect(() => { setGroupName(group.name) }, [group.name])
 
   const run = async (work: () => Promise<void>, leaveAfter = false) => {
     setBusy(true); setError(null)
@@ -140,6 +143,38 @@ export default function MembersPanel({
 
         {isOwner ? (
           <div className="space-y-2">
+            <form
+              className="rounded-lg border border-line p-3 mb-3"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const nextName = groupName.trim()
+                if (!nextName || nextName === group.name) return
+                run(() => renameGroup(group.id, nextName))
+              }}
+            >
+              <label htmlFor="group-name" className="block text-xs font-bold text-ink/70 mb-2">
+                {t('그룹 이름 변경')}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="group-name"
+                  value={groupName}
+                  maxLength={80}
+                  disabled={busy}
+                  onChange={(event) => setGroupName(event.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-campus disabled:opacity-50"
+                  aria-label={t('새 그룹 이름')}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !groupName.trim() || groupName.trim() === group.name}
+                  className="shrink-0 rounded-lg bg-campus px-3 py-2 text-xs font-bold text-paper disabled:opacity-30"
+                >
+                  {busy ? t('저장중...') : t('이름 저장')}
+                </button>
+              </div>
+              <p className="text-[11px] text-ink/40 mt-2">{t('변경한 이름은 모든 멤버에게 바로 표시돼요.')}</p>
+            </form>
             {group.archivedAt ? (
               <button
                 disabled={busy}

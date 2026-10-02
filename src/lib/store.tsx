@@ -25,6 +25,7 @@ interface Ctx {
   castVote: (excuseId: string, voterMemberId: string, approve: boolean) => Promise<void>
   markFinesSettled: (memberId: string, groupId: string) => Promise<void>
   setTreasurer: (groupId: string, memberId: string) => Promise<void>
+  renameGroup: (groupId: string, name: string) => Promise<void>
   transferOwnership: (groupId: string, memberId: string) => Promise<void>
   leaveGroup: (groupId: string) => Promise<void>
   archiveGroup: (groupId: string) => Promise<void>
@@ -253,6 +254,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await refreshAll()
   }, [refreshAll])
 
+  const renameGroup = useCallback(async (groupId: string, name: string) => {
+    const { error } = await supabase.rpc('rename_group', { p_group_id: groupId, p_name: name })
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
   const transferOwnership = useCallback(async (groupId: string, memberId: string) => {
     const { error } = await supabase.rpc('transfer_group_ownership', { p_group_id: groupId, p_new_owner_id: memberId })
     if (error) throw new Error(error.message)
@@ -315,7 +322,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       data, loading,
       createGroup, joinGroup, addTimetableEntry, updateTimetableEntry, removeTimetableEntry, restoreTimetableEntry,
       checkIn, cancelCheckIn, fileExcuse, castVote, markFinesSettled, setTreasurer,
-      transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup, processAutoAbsences,
+      renameGroup, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup, processAutoAbsences,
     }}>
       {children}
     </StoreCtx.Provider>
