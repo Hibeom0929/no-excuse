@@ -3,11 +3,12 @@ import { useStore } from '../lib/store'
 import { Group, Weekday, TimetableEntry } from '../types'
 import { weekdayLabel } from '../lib/time'
 import { useLanguage } from '../lib/i18n'
+import NusmodsImporter from './NusmodsImporter'
 
 const WEEKDAYS: Weekday[] = [1, 2, 3, 4, 5]
 
 export default function TimetableEditor({ group, meId }: { group: Group; meId: string }) {
-  const { data, addTimetableEntry, updateTimetableEntry, removeTimetableEntry, restoreTimetableEntry } = useStore()
+  const { data, addTimetableEntry, addTimetableEntries, updateTimetableEntry, removeTimetableEntry, restoreTimetableEntry } = useStore()
   const { language, t } = useLanguage()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [subject, setSubject] = useState('')
@@ -40,6 +41,18 @@ export default function TimetableEditor({ group, meId }: { group: Group; meId: s
 
   return (
     <div className="space-y-6">
+      <NusmodsImporter
+        existingEntries={myEntries}
+        onImport={entries => addTimetableEntries(entries.map(entry => ({
+          groupId: group.id,
+          memberId: meId,
+          subject: entry.subject.trim(),
+          location: entry.location.trim() || undefined,
+          weekday: entry.weekday,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+        })))}
+      />
       <div>
         <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">
           {t('{{name}}님의 시간표 {{mode}}', { name: me?.name ?? '', mode: editingId ? t('수정') : t('등록') })}

@@ -16,6 +16,7 @@ interface Ctx {
   createGroup: (name: string, fineAmount: number, currency: CurrencyCode, accountInfo: string, requirePhotoToCheckIn: boolean) => Promise<string>
   joinGroup: (inviteCode: string) => Promise<string | null>
   addTimetableEntry: (e: Omit<TimetableEntry, 'id'>) => Promise<void>
+  addTimetableEntries: (entries: Array<Omit<TimetableEntry, 'id'>>) => Promise<void>
   updateTimetableEntry: (id: string, patch: Omit<TimetableEntry, 'id' | 'groupId' | 'memberId'>) => Promise<void>
   removeTimetableEntry: (id: string) => Promise<void>
   restoreTimetableEntry: (id: string) => Promise<void>
@@ -148,6 +149,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       group_id: e.groupId, member_id: e.memberId, subject: e.subject,
       location: e.location ?? null, weekday: e.weekday, start_time: e.startTime, end_time: e.endTime,
     })
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
+  const addTimetableEntries = useCallback(async (entries: Array<Omit<TimetableEntry, 'id'>>) => {
+    if (entries.length === 0) return
+    const { error } = await supabase.from('timetable_entries').insert(entries.map(entry => ({
+      group_id: entry.groupId, member_id: entry.memberId, subject: entry.subject,
+      location: entry.location ?? null, weekday: entry.weekday,
+      start_time: entry.startTime, end_time: entry.endTime,
+    })))
     if (error) throw new Error(error.message)
     await refreshAll()
   }, [refreshAll])
@@ -320,7 +332,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   return (
     <StoreCtx.Provider value={{
       data, loading,
-      createGroup, joinGroup, addTimetableEntry, updateTimetableEntry, removeTimetableEntry, restoreTimetableEntry,
+      createGroup, joinGroup, addTimetableEntry, addTimetableEntries, updateTimetableEntry, removeTimetableEntry, restoreTimetableEntry,
       checkIn, cancelCheckIn, fileExcuse, castVote, markFinesSettled, setTreasurer,
       renameGroup, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup, processAutoAbsences,
     }}>
