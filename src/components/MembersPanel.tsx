@@ -9,7 +9,7 @@ export default function MembersPanel({
   group, meId, onExitGroup,
 }: { group: Group; meId: string; onExitGroup: () => void }) {
   const {
-    setTreasurer, renameGroup, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup,
+    setTreasurer, setGroupPhotoRequirement, renameGroup, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup,
   } = useStore()
   const { t } = useLanguage()
   const [viewingMember, setViewingMember] = useState<Member | null>(null)
@@ -143,6 +143,34 @@ export default function MembersPanel({
 
         {isOwner ? (
           <div className="space-y-2">
+            <div className="rounded-lg border border-line p-3 mb-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold text-ink/70">{t('출석 인증샷 필수')}</p>
+                  <p className="text-[11px] text-ink/40 mt-1 leading-relaxed">
+                    {t('바꾼 시점 이후의 출석부터 적용되며, 기존 기록은 그대로 유지돼요.')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={group.requirePhotoToCheckIn}
+                  aria-label={t('출석 인증샷 필수')}
+                  disabled={busy || !!group.archivedAt}
+                  onClick={() => run(() => setGroupPhotoRequirement(group.id, !group.requirePhotoToCheckIn))}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+                    group.requirePhotoToCheckIn ? 'bg-campus' : 'bg-line'
+                  }`}
+                >
+                  <span className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                    group.requirePhotoToCheckIn ? 'translate-x-5' : 'translate-x-0'
+                  }`} />
+                </button>
+              </div>
+              <p className={`text-[11px] font-bold mt-2 ${group.requirePhotoToCheckIn ? 'text-campus' : 'text-ink/40'}`}>
+                {group.requirePhotoToCheckIn ? t('현재 필수') : t('현재 선택')}
+              </p>
+            </div>
             <form
               className="rounded-lg border border-line p-3 mb-3"
               onSubmit={(event) => {

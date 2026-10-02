@@ -134,8 +134,6 @@ export default function NusmodsImporter({
               </select>
             </label>
           </div>
-          <p className="text-[11px] text-ink/40 leading-relaxed">{t('현재는 NUSMods의 요일과 시간만 가져오며, Weeks 주차 구분은 매주 반복으로 등록돼요.')}</p>
-
           {mode === 'link' ? (
             <div className="space-y-2">
               <input value={link} onChange={event => setLink(event.target.value)} disabled={busy}

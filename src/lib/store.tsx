@@ -26,6 +26,7 @@ interface Ctx {
   castVote: (excuseId: string, voterMemberId: string, approve: boolean) => Promise<void>
   markFinesSettled: (memberId: string, groupId: string) => Promise<void>
   setTreasurer: (groupId: string, memberId: string) => Promise<void>
+  setGroupPhotoRequirement: (groupId: string, requirePhoto: boolean) => Promise<void>
   renameGroup: (groupId: string, name: string) => Promise<void>
   transferOwnership: (groupId: string, memberId: string) => Promise<void>
   leaveGroup: (groupId: string) => Promise<void>
@@ -266,6 +267,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await refreshAll()
   }, [refreshAll])
 
+  const setGroupPhotoRequirement = useCallback(async (groupId: string, requirePhoto: boolean) => {
+    const { error } = await supabase.rpc('set_group_photo_requirement', {
+      p_group_id: groupId,
+      p_require_photo: requirePhoto,
+    })
+    if (error) throw new Error(error.message)
+    await refreshAll()
+  }, [refreshAll])
+
   const renameGroup = useCallback(async (groupId: string, name: string) => {
     const { error } = await supabase.rpc('rename_group', { p_group_id: groupId, p_name: name })
     if (error) throw new Error(error.message)
@@ -334,7 +344,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       data, loading,
       createGroup, joinGroup, addTimetableEntry, addTimetableEntries, updateTimetableEntry, removeTimetableEntry, restoreTimetableEntry,
       checkIn, cancelCheckIn, fileExcuse, castVote, markFinesSettled, setTreasurer,
-      renameGroup, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup, processAutoAbsences,
+      setGroupPhotoRequirement, renameGroup, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup, processAutoAbsences,
     }}>
       {children}
     </StoreCtx.Provider>
