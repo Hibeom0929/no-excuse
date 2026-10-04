@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { useLanguage } from '../lib/i18n'
 import LanguageToggle from './LanguageToggle'
+import { validateEmail } from '../lib/email'
 
 type Mode = 'signIn' | 'signUp'
 
@@ -10,6 +11,10 @@ export default function Login() {
   const { t } = useLanguage()
   const [mode, setMode] = useState<Mode>('signIn')
   const [email, setEmail] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
+  const emailInput = useRef<HTMLInputElement>(null)
+  const checkedEmail = validateEmail(email)
+  const showEmailError = !checkedEmail.valid && (emailTouched || !!checkedEmail.suggestion)
   const [password, setPassword] = useState('')
   const [passwordAgain, setPasswordAgain] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +25,7 @@ export default function Login() {
     if (message === 'Invalid login credentials') return t('이메일 또는 비밀번호가 맞지 않아요.')
     if (message === 'Email not confirmed') return t('먼저 이메일로 보낸 확인 링크를 눌러주세요.')
     if (message === 'User already registered') return t('이미 가입된 이메일이에요. 로그인하거나 비밀번호를 재설정해주세요.')
-    return message
+    return t(message)
   }
 
   const switchMode = (next: Mode) => {
@@ -33,8 +38,10 @@ export default function Login() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
-    const normalizedEmail = email.trim()
-    if (!normalizedEmail || !password) return
+    setEmailTouched(true)
+    if (!checkedEmail.valid) { setError(null); setNotice(null); return }
+    const normalizedEmail = checkedEmail.email
+    if (!password) { setError(t('비밀번호를 입력해주세요.')); return }
 
     if (mode === 'signUp' && password.length < 6) {
       setError(t('비밀번호는 6자리 이상으로 만들어주세요.'))
@@ -65,14 +72,12 @@ export default function Login() {
   }
 
   const resetPassword = async () => {
-    if (!email.trim()) {
-      setError(t('먼저 이메일을 입력해주세요.'))
-      return
-    }
+    setEmailTouched(true)
+    if (!checkedEmail.valid) { setError(null); setNotice(null); return }
     setLoading(true)
     setError(null)
     setNotice(null)
-    const { error: resetError } = await requestPasswordReset(email.trim())
+    const { error: resetError } = await requestPasswordReset(checkedEmail.email)
     if (resetError) setError(friendlyError(resetError))
     else setNotice(t('비밀번호 설정 메일을 보냈어요. 메일의 링크에서 새 비밀번호를 만들어주세요.'))
     setLoading(false)
@@ -99,16 +104,40 @@ export default function Login() {
 
       {notice && <div className="mb-4 rounded-xl border border-campus/20 bg-campus/5 p-3 text-xs leading-relaxed text-campus">{notice}</div>}
 
-      <form className="space-y-3" onSubmit={submit}>
+      <form className="space-y-3" onSubmit={submit} noValidate>
         <input
+          ref={emailInput}
           type="email"
+          inputMode="email"
           autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           required
           value={email}
-          onChange={event => setEmail(event.target.value)}
+          onChange={event => { setEmail(event.target.value); setError(null); setNotice(null) }}
+          onBlur={() => setEmailTouched(true)}
+          aria-label={t('이메일')}
+          aria-invalid={showEmailError}
+          aria-describedby={showEmailError ? 'email-feedback' : undefined}
           placeholder={t('학교 이메일 또는 자주 쓰는 이메일')}
-          className="w-full border border-line rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-campus/30"
+          className={`w-full border rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-campus/30 ${showEmailError ? 'border-stamp/50' : 'border-line'}`}
         />
+        {showEmailError && !checkedEmail.valid && (
+          <div id="email-feedback" aria-live="polite" className="rounded-lg border border-stamp/20 bg-stamp/5 p-3 text-xs leading-relaxed">
+            <p className="text-stamp">{t(checkedEmail.error)}</p>
+            {checkedEmail.suggestion && (
+              <button type="button"
+                onClick={() => {
+                  setEmail(checkedEmail.suggestion!); setEmailTouched(true); setError(null); setNotice(null)
+                  emailInput.current?.focus()
+                }}
+                className="mt-2 max-w-full break-all text-left font-bold text-campus underline underline-offset-2">
+                {t('{{email}}으로 수정', { email: checkedEmail.suggestion })}
+              </button>
+            )}
+          </div>
+        )}
         <input
           type="password"
           autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}

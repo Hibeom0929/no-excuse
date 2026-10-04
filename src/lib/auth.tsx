@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { Profile, loadMyProfile, saveMyProfileName } from './profile'
+import { validateEmail } from './email'
 export type { Profile } from './profile'
 
 interface AuthCtx {
@@ -78,13 +79,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signInWithPassword = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const checked = validateEmail(email)
+    if (!checked.valid) return { error: checked.error }
+    const { error } = await supabase.auth.signInWithPassword({ email: checked.email, password })
     return { error: error?.message }
   }, [])
 
   const signUpWithPassword = useCallback(async (email: string, password: string) => {
+    const checked = validateEmail(email)
+    if (!checked.valid) return { error: checked.error }
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: checked.email,
       password,
       options: { emailRedirectTo: window.location.origin },
     })
@@ -92,7 +97,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const requestPasswordReset = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const checked = validateEmail(email)
+    if (!checked.valid) return { error: checked.error }
+    const { error } = await supabase.auth.resetPasswordForEmail(checked.email, {
       redirectTo: window.location.origin,
     })
     return { error: error?.message }
