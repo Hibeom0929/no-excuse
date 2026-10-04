@@ -23,11 +23,12 @@ export default function Onboarding() {
           setLoading(true); setError(null)
           const { error } = await updateName(name.trim())
           setLoading(false)
-          if (error) setError(error)
+          if (error) setError(t(error))
         }}
       >
         <input
           value={name}
+          maxLength={80}
           onChange={e => setName(e.target.value)}
           placeholder={t('예) 김민준')}
           className="w-full border border-line rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-campus/30"

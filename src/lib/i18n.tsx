@@ -5,6 +5,9 @@ type Variables = Record<string, string | number>
 
 const EN: Record<string, string> = {
   '불러오는 중...': 'Loading...',
+  '프로필을 불러오지 못했어요. 다시 시도해주세요.': 'Could not load your profile. Please try again.',
+  '프로필을 저장하지 못했어요. 다시 시도해주세요.': 'Could not save your profile. Please try again.',
+  '다시 시도': 'Try again',
   '로그아웃': 'Sign out',
   '한국어': 'Korean',
   '영어': 'English',
