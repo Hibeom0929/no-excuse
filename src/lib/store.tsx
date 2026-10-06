@@ -6,7 +6,9 @@ import { supabase } from './supabase'
 import { useAuth } from './auth'
 import { makeInviteCode } from './inviteCode'
 import { mapGroup, mapTimetable, mapAttendance, mapFine, mapExcuse } from './mappers'
-import { todayDateStr, todayWeekday, nowHHMM, hasClassEnded } from './time'
+import { todayDateStr, nowHHMM, hasClassEnded } from './time'
+import { submitExcuse, voteOnExcuse } from './excuseActions'
+import { entriesForDay } from './attendanceView'
 
 const EMPTY: AppData = { groups: [], timetable: [], attendance: [], fines: [], excuses: [] }
 
@@ -23,7 +25,7 @@ interface Ctx {
   checkIn: (entry: TimetableEntry, photo?: string) => Promise<void>
   cancelCheckIn: (record: AttendanceRecord) => Promise<void>
   fileExcuse: (record: AttendanceRecord, reason: string) => Promise<void>
-  castVote: (excuseId: string, voterMemberId: string, approve: boolean) => Promise<void>
+  castVote: (excuseId: string, approve: boolean) => Promise<void>
   markFinesSettled: (memberId: string, groupId: string) => Promise<void>
   setTreasurer: (groupId: string, memberId: string) => Promise<void>
   setGroupPhotoRequirement: (groupId: string, requirePhoto: boolean) => Promise<void>
@@ -63,7 +65,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       supabase.from('timetable_entries').select('*').in('group_id', groupIds),
       supabase.from('attendance_records').select('*').in('group_id', groupIds),
       supabase.from('fine_transactions').select('*').in('group_id', groupIds),
-      supabase.from('excuse_requests').select('*').in('group_id', groupIds),
+      supabase.from('excuse_requests').select('*').in('group_id', groupIds).is('superseded_by', null),
     ])
 
     const membersByGroup = new Map<string, Member[]>()
@@ -97,6 +99,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [meId])
 
   useEffect(() => { refreshAll() }, [refreshAll])
+
+  // Installed mobile apps can be suspended overnight and miss realtime events.
+  useEffect(() => {
+    const resume = () => { if (document.visibilityState === 'visible') void refreshAll() }
+    document.addEventListener('visibilitychange', resume)
+    window.addEventListener('pageshow', resume)
+    return () => {
+      document.removeEventListener('visibilitychange', resume)
+      window.removeEventListener('pageshow', resume)
+    }
+  }, [refreshAll])
 
   // 실시간 동기화: 친구가 체크인/투표하면 내 화면에도 반영되도록 구독.
   // (소규모 친구 그룹 용도라 테이블 전체를 구독 후 새로고침하는 단순한 방식을 씀 —
@@ -206,51 +219,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [refreshAll])
 
   const fileExcuse = useCallback(async (record: AttendanceRecord, reason: string) => {
-    if (!meId) return
-    const { error: excErr } = await supabase.from('excuse_requests').insert({
-      group_id: record.groupId, attendance_record_id: record.id, member_id: meId, reason, status: 'pending',
-    })
-    if (excErr) throw new Error(excErr.message)
-    const { error: updErr } = await supabase.from('attendance_records').update({ status: 'excused_pending' }).eq('id', record.id)
-    if (updErr) throw new Error(updErr.message)
+    if (!meId) throw new Error('로그인이 필요해요')
+    await submitExcuse(supabase, record.id, reason)
     await refreshAll()
   }, [meId, refreshAll])
 
-  const castVote = useCallback(async (excuseId: string, voterMemberId: string, approve: boolean) => {
-    const { error: voteErr } = await supabase.from('excuse_votes')
-      .upsert({ excuse_id: excuseId, voter_id: voterMemberId, approve })
-    if (voteErr) throw new Error(voteErr.message)
-
-    const { data: excuseRow } = await supabase.from('excuse_requests').select('*').eq('id', excuseId).single()
-    if (!excuseRow || excuseRow.status !== 'pending') { await refreshAll(); return }
-
-    const { data: memberRows } = await supabase.from('group_members').select('member_id').eq('group_id', excuseRow.group_id).is('left_at', null)
-    const otherMemberIds = (memberRows ?? []).map(r => r.member_id as string).filter(id => id !== excuseRow.member_id)
-    const totalVoters = otherMemberIds.length
-
-    const { data: voteRows } = await supabase.from('excuse_votes').select('*').eq('excuse_id', excuseId)
-    const votesByVoter = new Map((voteRows ?? []).map(v => [v.voter_id as string, v.approve as boolean]))
-    const votesForMembers = otherMemberIds.map(id => votesByVoter.get(id)).filter((v): v is boolean => v !== undefined)
-    const approveCount = votesForMembers.filter(v => v === true).length
-    const rejectCount = votesForMembers.filter(v => v === false).length
-
-    let newStatus: 'pending' | 'approved' | 'rejected' = 'pending'
-    if (totalVoters > 0 && approveCount > totalVoters / 2) newStatus = 'approved'
-    else if (totalVoters > 0 && rejectCount > totalVoters / 2) newStatus = 'rejected'
-    else if (totalVoters > 0 && votesForMembers.length === totalVoters) {
-      newStatus = approveCount > rejectCount ? 'approved' : 'rejected'
-    }
-
-    if (newStatus !== 'pending') {
-      await supabase.from('excuse_requests').update({ status: newStatus }).eq('id', excuseId)
-      const attStatus = newStatus === 'approved' ? 'excused_approved' : 'excused_rejected'
-      await supabase.from('attendance_records').update({ status: attStatus }).eq('id', excuseRow.attendance_record_id)
-      if (newStatus === 'approved') {
-        await supabase.from('fine_transactions').update({ status: 'waived' }).eq('attendance_record_id', excuseRow.attendance_record_id)
-      }
-    }
+  const castVote = useCallback(async (excuseId: string, approve: boolean) => {
+    if (!meId) throw new Error('로그인이 필요해요')
+    await voteOnExcuse(supabase, excuseId, approve)
     await refreshAll()
-  }, [refreshAll])
+  }, [meId, refreshAll])
 
   // 데모/소규모 신뢰 그룹 전제: 실제로는 총무만 누를 수 있게 UI에서 막고 있음 (RLS는 그룹원 전체 허용)
   const markFinesSettled = useCallback(async (memberId: string, groupId: string) => {
@@ -318,9 +296,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const processAutoAbsences = useCallback(async (group: Group) => {
     if (group.archivedAt) return
     const date = todayDateStr()
-    const wd = todayWeekday()
     const now = nowHHMM()
-    const todaysEntries = dataRef.current.timetable.filter(t => t.groupId === group.id && t.weekday === wd && !t.archivedAt)
+    const todaysEntries = entriesForDay(dataRef.current.timetable, group.id, date)
     let changed = false
     for (const entry of todaysEntries) {
       if (!hasClassEnded(entry.endTime, now)) continue

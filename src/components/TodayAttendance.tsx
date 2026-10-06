@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useStore } from '../lib/store'
 import { Group, Member } from '../types'
-import { todayDateStr, todayWeekday, nowHHMM, isWithinCheckInWindow, hasClassEnded, weekdayLabel } from '../lib/time'
+import { todayDateStr, todayWeekday, nowHHMM, isWithinCheckInWindow, hasClassEnded, weekdayLabel, formatDate } from '../lib/time'
+import { entriesForDay } from '../lib/attendanceView'
 import { formatMoney } from '../lib/currency'
 import { CheckInStamp, StampMark } from './StampButton'
 import ExcuseModal from './ExcuseModal'
@@ -11,36 +12,41 @@ import { useLanguage } from '../lib/i18n'
 export default function TodayAttendance({ group, meId }: { group: Group; meId: string }) {
   const { data, checkIn, cancelCheckIn, processAutoAbsences } = useStore()
   const { language, t } = useLanguage()
-  const [, forceTick] = useState(0)
+  const [clock, setClock] = useState(() => new Date())
   const [excuseTarget, setExcuseTarget] = useState<string | null>(null)
   const [viewingMember, setViewingMember] = useState<Member | null>(null)
 
   useEffect(() => {
-    processAutoAbsences(group)
-    const t = setInterval(() => {
-      processAutoAbsences(group)
-      forceTick(n => n + 1)
-    }, 20000)
-    return () => clearInterval(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [group.id])
+    const tick = () => {
+      setClock(new Date())
+      void processAutoAbsences(group)
+    }
+    const resume = () => { if (document.visibilityState === 'visible') tick() }
+    tick()
+    const timer = setInterval(tick, 20000)
+    document.addEventListener('visibilitychange', resume)
+    window.addEventListener('pageshow', resume)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', resume)
+      window.removeEventListener('pageshow', resume)
+    }
+  }, [group, processAutoAbsences])
 
-  const date = todayDateStr()
-  const wd = todayWeekday()
-  const now = nowHHMM()
+  const date = todayDateStr(clock)
+  const wd = todayWeekday(clock)
+  const now = nowHHMM(clock)
 
-  const myEntries = data.timetable
-    .filter(t => t.groupId === group.id && t.memberId === meId && t.weekday === wd && !t.archivedAt)
-    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+  const myEntries = entriesForDay(data.timetable, group.id, date, meId)
 
   const findRecord = (entryId: string) =>
-    data.attendance.find(a => a.timetableEntryId === entryId && a.date === date)
+    data.attendance.find(a => a.groupId === group.id && a.timetableEntryId === entryId && a.date === date)
 
   // 팀 전체 오늘 현황 (나 제외)
   const teamToday = group.members
     .filter(m => m.id !== meId && !m.leftAt)
     .map(m => {
-      const entries = data.timetable.filter(t => t.groupId === group.id && t.memberId === m.id && t.weekday === wd && !t.archivedAt)
+      const entries = entriesForDay(data.timetable, group.id, date, m.id)
       return { member: m, entries }
     })
     .filter(x => x.entries.length > 0)
@@ -145,8 +151,9 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
               const record = data.attendance.find(a => a.id === excuse.attendanceRecordId)
               const entry = record ? data.timetable.find(t => t.id === record.timetableEntryId) : undefined
               return (
-                <VoteCard key={excuse.id} groupId={group.id} excuseId={excuse.id} meId={meId}
-                  requesterName={requester?.name ?? '?'} subject={entry?.subject ?? t('수업')} reason={excuse.reason} />
+                <VoteCard key={excuse.id} excuseId={excuse.id}
+                  requesterName={requester?.name ?? '?'} subject={entry?.subject ?? t('수업')}
+                  date={record?.date} reason={excuse.reason} />
               )
             })}
           </div>
@@ -156,6 +163,7 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
       {teamToday.length > 0 && (
         <div>
           <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">{t('우리 팀 오늘 현황')}</h2>
+          <p className="text-xs text-ink/40 mb-2">{formatDate(date, language)} · {weekdayLabel(wd, language)}</p>
           <div className="bg-white border border-line rounded-xl divide-y divide-line">
             {teamToday.map(({ member, entries }) => (
               <button key={member.id} onClick={() => setViewingMember(member)}
@@ -191,36 +199,55 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
       )}
 
       {viewingMember && (
-        <MemberHistory group={group} member={viewingMember} onClose={() => setViewingMember(null)} />
+        <MemberHistory group={group} member={viewingMember} date={date} onClose={() => setViewingMember(null)} />
       )}
     </div>
   )
 }
 
 function VoteCard({
-  groupId, excuseId, meId, requesterName, subject, reason,
-}: { groupId: string; excuseId: string; meId: string; requesterName: string; subject: string; reason: string }) {
+  excuseId, requesterName, subject, reason, date,
+}: { excuseId: string; requesterName: string; subject: string; reason: string; date?: string }) {
   const { castVote } = useStore()
-  const { t } = useLanguage()
-  void groupId
+  const { language, t } = useLanguage()
+  const [busy, setBusy] = useState(false)
+  const submitting = useRef(false)
+  const [error, setError] = useState<string | null>(null)
+  const vote = async (approve: boolean) => {
+    if (submitting.current) return
+    submitting.current = true
+    setBusy(true); setError(null)
+    try {
+      await castVote(excuseId, approve)
+    } catch (err) {
+      setError(t(err instanceof Error ? err.message : '투표에 실패했어요'))
+    } finally {
+      submitting.current = false
+      setBusy(false)
+    }
+  }
   return (
     <div className="bg-white border border-gold/40 rounded-xl p-4 shadow-card">
       <div className="text-sm">
         <span className="text-ink/60">{t('{{name}}님이 {{subject}} 결석 해명을 요청했어요', { name: requesterName, subject })}</span>
       </div>
+      {date && <div className="text-xs text-ink/40 mt-1">{formatDate(date, language)}</div>}
       <p className="text-sm text-ink/70 bg-paper rounded-lg px-3 py-2 mt-2 leading-relaxed">"{reason}"</p>
+      {error && <p role="alert" className="text-sm text-stamp mt-2">{error}</p>}
       <div className="flex gap-2 mt-3">
         <button
-          onClick={() => castVote(excuseId, meId, false).catch(e => alert(e instanceof Error ? e.message : t('투표에 실패했어요')))}
-          className="flex-1 rounded-lg py-2 text-sm font-bold border border-line text-ink/60 hover:border-stamp hover:text-stamp"
+          disabled={busy}
+          onClick={() => vote(false)}
+          className="flex-1 rounded-lg py-2 text-sm font-bold border border-line text-ink/60 hover:border-stamp hover:text-stamp disabled:opacity-40"
         >
           {t('반려')}
         </button>
         <button
-          onClick={() => castVote(excuseId, meId, true).catch(e => alert(e instanceof Error ? e.message : t('투표에 실패했어요')))}
-          className="flex-1 rounded-lg py-2 text-sm font-bold bg-campus text-paper hover:bg-campusLight"
+          disabled={busy}
+          onClick={() => vote(true)}
+          className="flex-1 rounded-lg py-2 text-sm font-bold bg-campus text-paper hover:bg-campusLight disabled:opacity-40"
         >
-          {t('인정')}
+          {busy ? t('처리중...') : t('인정')}
         </button>
       </div>
     </div>
