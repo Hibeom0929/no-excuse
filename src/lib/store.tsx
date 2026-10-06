@@ -5,7 +5,8 @@ import {
 import { supabase } from './supabase'
 import { useAuth } from './auth'
 import { makeInviteCode } from './inviteCode'
-import { mapGroup, mapTimetable, mapAttendance, mapFine, mapExcuse } from './mappers'
+import { loadAppData } from './loadAppData'
+import { useLanguage } from './i18n'
 import { todayDateStr, nowHHMM, hasClassEnded } from './time'
 import { submitExcuse, voteOnExcuse } from './excuseActions'
 import { entriesForDay } from './attendanceView'
@@ -43,59 +44,28 @@ const StoreCtx = createContext<Ctx | null>(null)
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth()
   const meId = profile?.id ?? null
+  const { t } = useLanguage()
 
   const [data, setData] = useState<AppData>(EMPTY)
   const [loading, setLoading] = useState(true)
+  const [syncError, setSyncError] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
+  const refreshRevision = useRef(0)
   const dataRef = useRef(data)
   dataRef.current = data
 
   const refreshAll = useCallback(async () => {
+    const revision = ++refreshRevision.current
     if (!meId) { setData(EMPTY); setLoading(false); return }
-
-    const { data: myMemberships } = await supabase.from('group_members').select('group_id').eq('member_id', meId).is('left_at', null)
-    const groupIds = (myMemberships ?? []).map(m => m.group_id as string)
-
-    if (groupIds.length === 0) {
-      setData(EMPTY); setLoading(false); return
+    try {
+      const snapshot = await loadAppData(supabase, meId)
+      if (revision !== refreshRevision.current) return
+      setData(snapshot); setSyncError(false); setHasLoaded(true)
+    } catch {
+      if (revision === refreshRevision.current) setSyncError(true)
+    } finally {
+      if (revision === refreshRevision.current) setLoading(false)
     }
-
-    const [groupsRes, membersRes, ttRes, attRes, fineRes, excRes] = await Promise.all([
-      supabase.from('groups').select('*').in('id', groupIds),
-      supabase.from('group_members').select('group_id, member_id, left_at, profiles ( id, name )').in('group_id', groupIds),
-      supabase.from('timetable_entries').select('*').in('group_id', groupIds),
-      supabase.from('attendance_records').select('*').in('group_id', groupIds),
-      supabase.from('fine_transactions').select('*').in('group_id', groupIds),
-      supabase.from('excuse_requests').select('*').in('group_id', groupIds).is('superseded_by', null),
-    ])
-
-    const membersByGroup = new Map<string, Member[]>()
-    for (const row of membersRes.data ?? []) {
-      const list = membersByGroup.get(row.group_id) ?? []
-      const p = row.profiles as unknown as { id: string; name: string } | null
-      list.push({ id: row.member_id, name: p?.name?.trim() || '(이름 미설정)', leftAt: row.left_at ?? undefined })
-      membersByGroup.set(row.group_id, list)
-    }
-
-    const excuseIds = (excRes.data ?? []).map(r => r.id as string)
-    const votesRes = excuseIds.length
-      ? await supabase.from('excuse_votes').select('*').in('excuse_id', excuseIds)
-      : { data: [] as any[] }
-
-    const votesByExcuse = new Map<string, Record<string, boolean>>()
-    for (const v of votesRes.data ?? []) {
-      const rec = votesByExcuse.get(v.excuse_id) ?? {}
-      rec[v.voter_id] = v.approve
-      votesByExcuse.set(v.excuse_id, rec)
-    }
-
-    setData({
-      groups: (groupsRes.data ?? []).map(g => mapGroup(g, membersByGroup.get(g.id) ?? [])),
-      timetable: (ttRes.data ?? []).map(mapTimetable),
-      attendance: (attRes.data ?? []).map(mapAttendance),
-      fines: (fineRes.data ?? []).map(mapFine),
-      excuses: (excRes.data ?? []).map(r => mapExcuse(r, votesByExcuse.get(r.id) ?? {})),
-    })
-    setLoading(false)
   }, [meId])
 
   useEffect(() => { refreshAll() }, [refreshAll])
@@ -323,7 +293,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       checkIn, cancelCheckIn, fileExcuse, castVote, markFinesSettled, setTreasurer,
       setGroupPhotoRequirement, renameGroup, transferOwnership, leaveGroup, archiveGroup, restoreGroup, deleteGroup, processAutoAbsences,
     }}>
-      {children}
+      {syncError && <div role="alert" className="max-w-xl mx-auto px-5 pt-3 text-xs text-stamp">
+        {t(hasLoaded ? '동기화에 실패했어요. 마지막으로 확인한 기록을 표시하고 있어요.' : '기록을 불러오지 못했어요. 다시 시도해주세요.')}
+        <button onClick={() => void refreshAll()} className="ml-2 font-bold underline">{t('다시 시도')}</button>
+      </div>}
+      {(!syncError || hasLoaded) && children}
     </StoreCtx.Provider>
   )
 }

@@ -62,3 +62,37 @@ test('today team summary displays only today’s two course dots', () => {
   assert.match(html, /title="TODAY LATE"/)
   assert.doesNotMatch(html, /YESTERDAY CLASS/)
 })
+
+test('already voted request stays visible as awaiting result, not missing/deleted', () => {
+  data.excuses = [{ id: 'request', groupId: 'group', memberId: 'friend', attendanceRecordId: 'old',
+    status: 'pending', reason: 'VISIBLE REASON', votes: { me: true } }]
+  try {
+    const html = renderToStaticMarkup(React.createElement(TodayAttendance, { group, meId: 'me' }))
+    assert.match(html, /VISIBLE REASON/)
+    assert.match(html, /투표 완료 · 결과 대기 중/)
+    assert.match(html, /내 투표: 인정/)
+    assert.doesNotMatch(html, />반려<\/button>|>인정<\/button>/)
+  } finally { data.excuses = [] }
+})
+
+test('unvoted request remains actionable for a different member', () => {
+  data.excuses = [{ id: 'request', groupId: 'group', memberId: 'friend', attendanceRecordId: 'old',
+    status: 'pending', reason: 'ACTIONABLE REASON', votes: { someoneElse: true } }]
+  try {
+    const html = renderToStaticMarkup(React.createElement(TodayAttendance, { group, meId: 'me' }))
+    assert.match(html, /ACTIONABLE REASON/)
+    assert.match(html, />반려<\/button>/)
+    assert.match(html, />인정<\/button>/)
+  } finally { data.excuses = [] }
+})
+
+test('today’s finalized request stays visible with its decision', () => {
+  data.excuses = [{ id: 'request', groupId: 'group', memberId: 'friend', attendanceRecordId: 'today-record',
+    status: 'approved', reason: 'DECIDED REASON', votes: { me: true } }]
+  data.attendance.push({ id: 'today-record', groupId: 'group', memberId: 'friend', timetableEntryId: 'TODAY CLASS', date: '2026-10-06', status: 'excused_approved' })
+  try {
+    const html = renderToStaticMarkup(React.createElement(TodayAttendance, { group, meId: 'me' }))
+    assert.match(html, /DECIDED REASON/)
+    assert.match(html, /해명 승인됨/)
+  } finally { data.excuses = []; data.attendance.pop() }
+})

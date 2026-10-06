@@ -51,12 +51,11 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
     })
     .filter(x => x.entries.length > 0)
 
-  // 내가 투표해야 할 해명 요청들
-  const pendingVotesForMe = data.excuses.filter(e => {
-    if (e.groupId !== group.id || e.status !== 'pending') return false
-    if (e.memberId === meId) return false
-    return e.votes[meId] === undefined
-  })
+  // A cast vote must not make its request look deleted. Keep pending requests
+  // (including my own/voted ones) and today's decided requests visible.
+  const visibleExcuses = data.excuses.filter(e => e.groupId === group.id && (
+    e.status === 'pending' || data.attendance.some(a => a.id === e.attendanceRecordId && a.date === date)
+  ))
 
   return (
     <div className="space-y-6">
@@ -142,18 +141,19 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
         )}
       </div>
 
-      {pendingVotesForMe.length > 0 && (
+      {visibleExcuses.length > 0 && (
         <div>
-          <h2 className="text-xs font-bold text-gold mb-3 tracking-wide">{t('🗳 내 투표가 필요해요')}</h2>
+          <h2 className="text-xs font-bold text-gold mb-3 tracking-wide">{t('🗳 해명·투표 현황')}</h2>
           <div className="space-y-2.5">
-            {pendingVotesForMe.map(excuse => {
+            {visibleExcuses.map(excuse => {
               const requester = group.members.find(m => m.id === excuse.memberId)
               const record = data.attendance.find(a => a.id === excuse.attendanceRecordId)
               const entry = record ? data.timetable.find(t => t.id === record.timetableEntryId) : undefined
               return (
                 <VoteCard key={excuse.id} excuseId={excuse.id}
                   requesterName={requester?.name ?? '?'} subject={entry?.subject ?? t('수업')}
-                  date={record?.date} reason={excuse.reason} />
+                  date={record?.date} reason={excuse.reason} status={excuse.status}
+                  ownRequest={excuse.memberId === meId} myVote={excuse.votes[meId]} />
               )
             })}
           </div>
@@ -168,7 +168,17 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
             {teamToday.map(({ member, entries }) => (
               <button key={member.id} onClick={() => setViewingMember(member)}
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-paper/60 transition-colors text-left">
-                <span className="text-sm font-medium text-ink/80">{member.name}</span>
+                <span className="min-w-0 flex-1 mr-2">
+                  <span className="block text-sm font-medium text-ink/80">{member.name}</span>
+                  {entries.map(entry => {
+                    const r = findRecord(entry.id)
+                    const label = r?.status === 'present' ? '출석' : r?.status === 'absent' ? '결석'
+                      : r?.status === 'excused_pending' ? '해명 투표중'
+                      : r?.status === 'excused_approved' ? '해명 승인'
+                      : r?.status === 'excused_rejected' ? '해명 반려' : '체크인 전'
+                    return <span key={entry.id} className="block text-[11px] text-ink/50 mt-1">{entry.subject} · {t(label)}</span>
+                  })}
+                </span>
                 <div className="flex items-center gap-2.5">
                   <div className="flex gap-1.5">
                     {entries.map(entry => {
@@ -206,8 +216,9 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
 }
 
 function VoteCard({
-  excuseId, requesterName, subject, reason, date,
-}: { excuseId: string; requesterName: string; subject: string; reason: string; date?: string }) {
+  excuseId, requesterName, subject, reason, date, status, ownRequest, myVote,
+}: { excuseId: string; requesterName: string; subject: string; reason: string; date?: string;
+  status: 'pending' | 'approved' | 'rejected'; ownRequest: boolean; myVote?: boolean }) {
   const { castVote } = useStore()
   const { language, t } = useLanguage()
   const [busy, setBusy] = useState(false)
@@ -232,9 +243,14 @@ function VoteCard({
         <span className="text-ink/60">{t('{{name}}님이 {{subject}} 결석 해명을 요청했어요', { name: requesterName, subject })}</span>
       </div>
       {date && <div className="text-xs text-ink/40 mt-1">{formatDate(date, language)}</div>}
+      <p className="text-xs font-bold text-campus mt-2">
+        {status === 'approved' ? t('해명 승인됨') : status === 'rejected' ? t('해명 반려됨')
+          : myVote !== undefined ? t('투표 완료 · 결과 대기 중') : ownRequest ? t('팀원 투표 대기 중') : t('내 투표가 필요해요')}
+      </p>
+      {myVote !== undefined && <p className="text-xs text-ink/50 mt-1">{t('내 투표: {{vote}}', { vote: t(myVote ? '인정' : '반려') })}</p>}
       <p className="text-sm text-ink/70 bg-paper rounded-lg px-3 py-2 mt-2 leading-relaxed">"{reason}"</p>
       {error && <p role="alert" className="text-sm text-stamp mt-2">{error}</p>}
-      <div className="flex gap-2 mt-3">
+      {status === 'pending' && !ownRequest && myVote === undefined && <div className="flex gap-2 mt-3">
         <button
           disabled={busy}
           onClick={() => vote(false)}
@@ -249,7 +265,7 @@ function VoteCard({
         >
           {busy ? t('처리중...') : t('인정')}
         </button>
-      </div>
+      </div>}
     </div>
   )
 }

@@ -1,4 +1,4 @@
--- Run in SQL Editor as postgres after the migration. All fixtures and votes are
+-- Run in SQL Editor as postgres after all migrations. All fixtures and votes are
 -- inside one ROLLBACK transaction: no real member's attendance/fine is changed.
 begin;
 do $$
@@ -35,6 +35,11 @@ begin
   insert into public.fine_transactions (group_id, member_id, attendance_record_id, amount, reason, date, status)
     values (v_group, v_members[1], v_record, 10, 'ROLLBACK ONLY tie', '2026-10-13', 'charged');
   perform set_config('no_excuse.test_tie_record', v_record::text, true);
+  insert into public.attendance_records (group_id, member_id, timetable_entry_id, date, status)
+    values (v_group, v_members[1], v_entry, '2026-10-20', 'absent') returning id into v_record;
+  insert into public.fine_transactions (group_id, member_id, attendance_record_id, amount, reason, date, status)
+    values (v_group, v_members[1], v_record, 10, 'ROLLBACK ONLY legacy', '2026-10-20', 'charged');
+  perform set_config('no_excuse.test_legacy_record', v_record::text, true);
 end;
 $$;
 
@@ -47,24 +52,57 @@ declare
 begin
   perform set_config('request.jwt.claim.sub', current_setting('no_excuse.test_requester'), true);
   v_request := public.submit_excuse(v_record, 'Tie test');
-  begin
-    insert into public.excuse_requests (group_id, attendance_record_id, member_id, reason)
-      values (current_setting('no_excuse.test_group')::uuid, v_record, auth.uid(), 'Direct duplicate');
-  exception when insufficient_privilege then v_blocked := true;
-  end;
-  assert v_blocked, 'Direct insert must not bypass the checked submission RPC';
+  insert into public.excuse_requests (group_id, attendance_record_id, member_id, reason)
+    values (current_setting('no_excuse.test_group')::uuid, v_record, auth.uid(), 'Direct duplicate');
+  assert (select count(*) from public.excuse_requests where attendance_record_id = v_record) = 1,
+    'Cached client duplicate insert is safely skipped';
   perform set_config('request.jwt.claim.sub', current_setting('no_excuse.test_voter_a'), true);
   assert public.cast_excuse_vote(v_request, true) = 'pending';
   v_blocked := false;
   begin
-    insert into public.excuse_votes (excuse_id, voter_id, approve) values (v_request, auth.uid(), false);
-  exception when insufficient_privilege then v_blocked := true;
+    insert into public.excuse_votes (excuse_id, voter_id, approve)
+      values (v_request, current_setting('no_excuse.test_requester')::uuid, false);
+  exception when raise_exception then v_blocked := true;
   end;
-  assert v_blocked, 'Direct vote must not bypass the checked voting RPC';
+  assert v_blocked, 'Cached client must not forge another member vote';
   perform set_config('request.jwt.claim.sub', current_setting('no_excuse.test_voter_b'), true);
   assert public.cast_excuse_vote(v_request, false) = 'rejected', 'Tie rejects only when everyone has voted';
   assert (select status from public.attendance_records where id = v_record) = 'excused_rejected';
   assert (select status from public.fine_transactions where attendance_record_id = v_record) = 'charged';
+end;
+$$;
+
+-- Cached pre-RPC clients can submit and vote using their original INSERT/upsert
+-- calls, but duplicate requests/updates are skipped and outcomes stay atomic.
+do $$
+declare
+  v_record uuid := current_setting('no_excuse.test_legacy_record')::uuid;
+  v_request uuid;
+begin
+  perform set_config('request.jwt.claim.sub', current_setting('no_excuse.test_requester'), true);
+  insert into public.excuse_requests (group_id, attendance_record_id, member_id, reason)
+    values (current_setting('no_excuse.test_group')::uuid, v_record, auth.uid(), 'Legacy reason') returning id into v_request;
+  assert v_request is not null, 'Cached client must be able to file an excuse';
+  assert (select status from public.attendance_records where id = v_record) = 'excused_pending';
+  insert into public.excuse_requests (group_id, attendance_record_id, member_id, reason)
+    values (current_setting('no_excuse.test_group')::uuid, v_record, auth.uid(), 'Legacy double tap');
+  assert (select count(*) from public.excuse_requests where attendance_record_id = v_record) = 1;
+
+  perform set_config('request.jwt.claim.sub', current_setting('no_excuse.test_voter_a'), true);
+  insert into public.excuse_votes (excuse_id, voter_id, approve) values (v_request, auth.uid(), true)
+    on conflict (excuse_id, voter_id) do update set approve = excluded.approve;
+  insert into public.excuse_votes (excuse_id, voter_id, approve) values (v_request, auth.uid(), false)
+    on conflict (excuse_id, voter_id) do update set approve = excluded.approve;
+  assert (select count(*) from public.excuse_votes where excuse_id = v_request) = 1;
+  assert (select approve from public.excuse_votes where excuse_id = v_request and voter_id = auth.uid()) is true;
+  assert (select status from public.excuse_requests where id = v_request) = 'pending';
+
+  perform set_config('request.jwt.claim.sub', current_setting('no_excuse.test_voter_b'), true);
+  insert into public.excuse_votes (excuse_id, voter_id, approve) values (v_request, auth.uid(), true)
+    on conflict (excuse_id, voter_id) do update set approve = excluded.approve;
+  assert (select status from public.excuse_requests where id = v_request) = 'approved';
+  assert (select status from public.attendance_records where id = v_record) = 'excused_approved';
+  assert (select status from public.fine_transactions where attendance_record_id = v_record) = 'waived';
 end;
 $$;
 
@@ -141,4 +179,4 @@ end;
 $$;
 reset role;
 rollback;
-select 'PASS: request/vote retries, majority waiver, tie rejection, direct-write/own-vote/outsider/anonymous denial; all fixtures rolled back' as result;
+select 'PASS: new RPC + cached client INSERT/upsert, retries, majority/tie, forged/own/outsider/anonymous denial; all fixtures rolled back' as result;
