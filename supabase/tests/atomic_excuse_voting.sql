@@ -1,5 +1,7 @@
 -- Run in SQL Editor as postgres after all migrations. All fixtures and votes are
 -- inside one ROLLBACK transaction: no real member's attendance/fine is changed.
+-- All test absences are at least four weeks old: filing and voting must have no
+-- date cutoff (including cached-client INSERT/upsert calls).
 begin;
 do $$
 declare
@@ -26,19 +28,19 @@ begin
   insert into public.timetable_entries (group_id, member_id, subject, weekday, start_time, end_time)
     values (v_group, v_members[1], 'ROLLBACK ONLY', 2, '10:00', '11:00') returning id into v_entry;
   insert into public.attendance_records (group_id, member_id, timetable_entry_id, date, status)
-    values (v_group, v_members[1], v_entry, '2026-10-06', 'absent') returning id into v_record;
+    values (v_group, v_members[1], v_entry, current_date - 30, 'absent') returning id into v_record;
   insert into public.fine_transactions (group_id, member_id, attendance_record_id, amount, reason, date, status)
-    values (v_group, v_members[1], v_record, 10, 'ROLLBACK ONLY', '2026-10-06', 'charged');
+    values (v_group, v_members[1], v_record, 10, 'ROLLBACK ONLY', current_date - 30, 'charged');
   perform set_config('no_excuse.test_record', v_record::text, true);
   insert into public.attendance_records (group_id, member_id, timetable_entry_id, date, status)
-    values (v_group, v_members[1], v_entry, '2026-10-13', 'absent') returning id into v_record;
+    values (v_group, v_members[1], v_entry, current_date - 29, 'absent') returning id into v_record;
   insert into public.fine_transactions (group_id, member_id, attendance_record_id, amount, reason, date, status)
-    values (v_group, v_members[1], v_record, 10, 'ROLLBACK ONLY tie', '2026-10-13', 'charged');
+    values (v_group, v_members[1], v_record, 10, 'ROLLBACK ONLY tie', current_date - 29, 'charged');
   perform set_config('no_excuse.test_tie_record', v_record::text, true);
   insert into public.attendance_records (group_id, member_id, timetable_entry_id, date, status)
-    values (v_group, v_members[1], v_entry, '2026-10-20', 'absent') returning id into v_record;
+    values (v_group, v_members[1], v_entry, current_date - 28, 'absent') returning id into v_record;
   insert into public.fine_transactions (group_id, member_id, attendance_record_id, amount, reason, date, status)
-    values (v_group, v_members[1], v_record, 10, 'ROLLBACK ONLY legacy', '2026-10-20', 'charged');
+    values (v_group, v_members[1], v_record, 10, 'ROLLBACK ONLY legacy', current_date - 28, 'charged');
   perform set_config('no_excuse.test_legacy_record', v_record::text, true);
 end;
 $$;

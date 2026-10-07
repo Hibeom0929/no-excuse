@@ -2,10 +2,12 @@ import React, { useRef, useState } from 'react'
 import { useStore } from '../lib/store'
 import { AttendanceRecord } from '../types'
 import { useLanguage } from '../lib/i18n'
+import { formatDate } from '../lib/time'
 
 export default function ExcuseModal({ record, onClose }: { record: AttendanceRecord; onClose: () => void }) {
-  const { fileExcuse } = useStore()
-  const { t } = useLanguage()
+  const { data, fileExcuse } = useStore()
+  const { language, t } = useLanguage()
+  const entry = data.timetable.find(e => e.id === record.timetableEntryId)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const submitting = useRef(false)
@@ -19,6 +21,10 @@ export default function ExcuseModal({ record, onClose }: { record: AttendanceRec
         onClick={e => e.stopPropagation()}
       >
         <h3 className="font-bold text-ink mb-1">{t('결석 해명하기')}</h3>
+        <div className="bg-paper rounded-lg px-3 py-2 my-3 text-sm">
+          <p className="font-bold text-ink">{entry?.subject ?? t('(삭제된 수업)')}</p>
+          <p className="text-xs text-ink/50 mt-1">{formatDate(record.date, language)}{entry ? ` · ${entry.startTime}–${entry.endTime}` : ''}</p>
+        </div>
         <p className="text-xs text-ink/50 mb-4">{t('사유를 적으면 팀원들의 투표로 벌금 면제 여부가 결정돼요. 과반수가 인정하면 벌금이 면제돼요.')}</p>
         <textarea
           value={reason}

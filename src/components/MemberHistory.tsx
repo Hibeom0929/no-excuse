@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { useStore } from '../lib/store'
-import { Group, Member } from '../types'
+import { AttendanceRecord, Group, Member } from '../types'
 import { weekdayLabel, formatDate, todayDateStr } from '../lib/time'
 import { attendanceForDay, entriesForDay, weekdayForDate } from '../lib/attendanceView'
 import { useLanguage } from '../lib/i18n'
+import ExcuseModal from './ExcuseModal'
 
 const STATUS_COLOR: Record<string, string> = {
   present: 'text-campus bg-campus/10',
@@ -14,11 +15,14 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export default function MemberHistory({
-  group, member, onClose, date,
-}: { group: Group; member: Member; onClose: () => void; date?: string }) {
+  group, member, onClose, date, meId,
+}: { group: Group; member: Member; onClose: () => void; date?: string; meId?: string }) {
   const { data } = useStore()
   const { language, t } = useLanguage()
   const [showAll, setShowAll] = useState(!date)
+  const [excuseTarget, setExcuseTarget] = useState<AttendanceRecord | null>(null)
+  const ownHistory = member.id === meId
+  const canRequest = ownHistory && !group.archivedAt && !member.leftAt
   const day = date ?? todayDateStr()
   const statusLabel: Record<string, string> = {
     present: t('출석'), absent: t('결석'), excused_pending: t('해명 투표중'),
@@ -35,12 +39,13 @@ export default function MemberHistory({
   const dayEntries = entriesForDay(data.timetable, group.id, day, member.id)
 
   return (
+    <>
     <div className="fixed inset-0 bg-ink/40 flex items-end md:items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-t-2xl md:rounded-2xl p-5 w-full md:max-w-sm max-h-[85vh] overflow-y-auto shadow-card"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-bold text-ink text-lg">{member.name}</h3>
-          <span className="text-[10px] font-bold text-ink/30 bg-paper rounded-full px-2 py-1">{t('읽기 전용')}</span>
+          <span className="text-[10px] font-bold text-ink/30 bg-paper rounded-full px-2 py-1">{t(ownHistory ? '내 출석 기록' : '읽기 전용')}</span>
         </div>
         <div className="flex gap-2 my-3">
           <button onClick={() => setShowAll(false)} aria-pressed={!showAll}
@@ -75,6 +80,7 @@ export default function MemberHistory({
         ) : (
           <>
             <p className="text-xs text-ink/40 mb-4">{t('등록 수업 {{classes}}개 · 출석 {{present}} · 결석 {{absent}}', { classes: myTimetable.length, present: presentCount, absent: absentCount })}</p>
+            {canRequest && <p className="text-xs text-ink/50 mb-3">{t('지난 결석도 해명을 제출할 수 있어요. 미결 투표는 결과가 정해질 때까지 유지돼요.')}</p>}
             {records.length === 0 ? (
               <div className="bg-paper rounded-xl p-6 text-center text-sm text-ink/40">{t('아직 출석 기록이 없어요.')}</div>
             ) : (
@@ -82,16 +88,23 @@ export default function MemberHistory({
                 {records.map(r => {
                   const entry = data.timetable.find(t => t.id === r.timetableEntryId)
                   return (
-                    <div key={r.id} className="flex items-center justify-between bg-paper rounded-lg px-3 py-2.5">
-                      <div className="text-sm">
+                    <div key={r.id} className="flex items-center justify-between gap-2 bg-paper rounded-lg px-3 py-2.5">
+                      <div className="min-w-0 text-sm">
                         <div className="font-medium text-ink">{entry?.subject ?? t('(삭제된 수업)')}</div>
                         <div className="text-[11px] text-ink/40 font-mono">
                           {formatDate(r.date, language)}{entry ? ` · ${weekdayLabel(weekdayForDate(r.date), language)} ${entry.startTime}` : ''}
                         </div>
                       </div>
-                      <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 ${STATUS_COLOR[r.status]}`}>
-                        {statusLabel[r.status]}
-                      </span>
+                      <div className="shrink-0 flex flex-col items-end gap-2">
+                        <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 ${STATUS_COLOR[r.status]}`}>
+                          {statusLabel[r.status]}
+                        </span>
+                        {canRequest && r.status === 'absent' && !data.excuses.some(e => e.attendanceRecordId === r.id) && (
+                          <button onClick={() => setExcuseTarget(r)} className="text-xs font-bold bg-white text-ink border border-gold/50 rounded-lg px-3 py-2 hover:bg-gold/10">
+                            {t('해명하고 투표 요청')}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
@@ -103,5 +116,7 @@ export default function MemberHistory({
         <button onClick={onClose} className="w-full mt-4 rounded-lg py-2.5 text-sm font-bold text-ink/50 hover:bg-paper">{t('닫기')}</button>
       </div>
     </div>
+    {excuseTarget && <ExcuseModal record={excuseTarget} onClose={() => setExcuseTarget(null)} />}
+    </>
   )
 }

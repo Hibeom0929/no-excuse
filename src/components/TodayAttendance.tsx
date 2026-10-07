@@ -141,9 +141,17 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
         )}
       </div>
 
+      {group.members.some(m => m.id === meId) && (
+        <button onClick={() => setViewingMember(group.members.find(m => m.id === meId)!)}
+          className="w-full text-left bg-white border border-line rounded-xl p-4 text-sm font-bold text-campus hover:bg-campus/5">
+          {t('지난 출석·결석 기록 →')}
+        </button>
+      )}
+
       {visibleExcuses.length > 0 && (
         <div>
           <h2 className="text-xs font-bold text-gold mb-3 tracking-wide">{t('🗳 해명·투표 현황')}</h2>
+          <p className="text-xs text-ink/50 mb-3">{t('미결 투표는 날짜가 지나도 결과가 정해질 때까지 남아 있어요.')}</p>
           <div className="space-y-2.5">
             {visibleExcuses.map(excuse => {
               const requester = group.members.find(m => m.id === excuse.memberId)
@@ -209,7 +217,8 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
       )}
 
       {viewingMember && (
-        <MemberHistory group={group} member={viewingMember} date={date} onClose={() => setViewingMember(null)} />
+        <MemberHistory group={group} member={viewingMember} meId={meId}
+          date={viewingMember.id === meId ? undefined : date} onClose={() => setViewingMember(null)} />
       )}
     </div>
   )

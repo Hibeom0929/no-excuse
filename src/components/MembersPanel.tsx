@@ -70,9 +70,7 @@ export default function MembersPanel({
                 {m.id === group.ownerId && <span className="text-[10px] font-bold text-gold bg-gold/10 rounded-full px-2 py-0.5">{t('방장')}</span>}
                 {m.id === group.treasurerId && <span className="text-[10px] font-bold text-campus bg-campus/10 rounded-full px-2 py-0.5">{t('총무')}</span>}
               </div>
-              {m.id !== meId && (
-                <button onClick={() => setViewingMember(m)} className="text-xs font-bold text-ink/40 hover:text-campus">{t('출석 보기 →')}</button>
-              )}
+              <button onClick={() => setViewingMember(m)} className="text-xs font-bold text-ink/40 hover:text-campus">{t(m.id === meId ? '내 기록 보기 →' : '출석 보기 →')}</button>
             </div>
           ))}
         </div>
@@ -260,7 +258,7 @@ export default function MembersPanel({
       </div>
 
       {viewingMember && (
-        <MemberHistory group={group} member={viewingMember} onClose={() => setViewingMember(null)} />
+        <MemberHistory group={group} member={viewingMember} meId={meId} onClose={() => setViewingMember(null)} />
       )}
     </div>
   )
