@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import vm from 'node:vm'
+test('production PWA imports the push event worker', () => {
+  const config = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8')
+  assert.match(config, /importScripts:\s*\['\/push-worker\.js'\]/)
+})
 
 const script = readFileSync(new URL('../public/push-worker.js', import.meta.url), 'utf8')
 const memberId = '00000000-0000-4000-8000-000000000001'

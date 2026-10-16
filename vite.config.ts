@@ -30,6 +30,7 @@ export default defineConfig({
       // Supabase API 요청까지 캐시하면 오래된 데이터가 보일 수 있어서
       // 정적 자산(코드/이미지)만 캐시하고, API 호출은 항상 네트워크로 보낸다.
       workbox: {
+        importScripts: ['/push-worker.js'],
         navigateFallbackDenylist: [/^\/auth\//],
         runtimeCaching: [
           {
