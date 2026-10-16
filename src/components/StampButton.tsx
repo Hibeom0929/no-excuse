@@ -83,7 +83,7 @@ export function CheckInStamp({
           {submitting ? t('처리중...') : loadingPhoto ? t('사진 처리중...') : t('출석 도장 찍기')}
         </button>
       </div>
-      <p className="text-[11px] text-ink/40">{t('사진을 첨부하면 팀 스토리에 공유돼요.')}</p>
+      <p className="text-[11px] leading-relaxed text-ink/60">{t('사진은 팀 스토리에 하루 동안 공유되고, 이후 학기 말 정리 전까지 비공개로 보관돼요.')}</p>
       {photoError && <p role="alert" className="text-[11px] text-stamp">{photoError}</p>}
     </div>
   )

@@ -13,6 +13,7 @@ const modules = {
   'react-dom': { createPortal: () => null },
   '../lib/i18n': { useLanguage: () => ({ language: 'ko', t: translate }) },
   '../lib/supabase': { supabase: {} },
+  '../lib/image': { compressImageFile: async () => '' },
 }
 function load(path) {
   const exports = {}
@@ -24,6 +25,7 @@ function load(path) {
 }
 modules['../lib/stories'] = load('../src/lib/stories.ts')
 const AttendanceStories = load('../src/components/AttendanceStories.tsx').default
+const { CheckInStamp } = load('../src/components/StampButton.tsx')
 const group = { id: 'g', members: [{ id: 'me', name: '나' }, { id: 'friend', name: '친구' }] }
 const records = [{ id: 'a', groupId: 'g', memberId: 'friend', status: 'present' }]
 function fixture(overrides = {}) {
@@ -50,4 +52,12 @@ test('archived groups and cancelled attendance leave no story UI', () => {
   assert.equal(render({ records: [] }), '')
   assert.equal(render({ group: { ...group, archivedAt: 'archived' } }), '')
   assert.equal(render({ group: { ...group, members: [{ id: 'friend', name: '친구', leftAt: 'left' }] } }), '')
+})
+
+test('upload form explains one-day sharing AND private semester retention before upload', () => {
+  initialStories = []
+  const html = renderToStaticMarkup(React.createElement(CheckInStamp, { requirePhoto: false, onConfirm() {} }))
+  assert.match(html, /하루 동안 공유/)
+  assert.match(html, /학기 말 정리 전까지 비공개로 보관/)
+  assert.doesNotMatch(html, /24시간.*삭제/)
 })

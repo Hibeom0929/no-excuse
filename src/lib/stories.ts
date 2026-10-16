@@ -70,8 +70,8 @@ export async function checkInWithStory(
     if (path && committed && !keepUpload) {
       // A successful idempotent retry can leave an unused upload. On ANY RPC
       // failure/timeout its commit state is ambiguous: leave the file alone;
-      // only the server's orphan sweep can safely decide whether to remove it.
-      try { await client.storage.from(STORY_BUCKET).remove([path]) } catch { /* server sweep retries orphans */ }
+      // Keep it private for a future, explicitly approved semester cleanup.
+      try { await client.storage.from(STORY_BUCKET).remove([path]) } catch { /* retained for later cleanup */ }
     }
   }
 }

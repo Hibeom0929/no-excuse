@@ -99,7 +99,7 @@ const EN: Record<string, string> = {
   '수업': 'Class',
   '우리 팀 오늘 현황': "Today's group status",
   '우리 팀의 하루': 'Our day',
-  '사진을 첨부하면 팀 스토리에 공유돼요.': 'Attached photos are shared in your group’s stories.',
+  '사진은 팀 스토리에 하루 동안 공유되고, 이후 학기 말 정리 전까지 비공개로 보관돼요.': 'Photos are shared in team stories for one day, then kept privately until end-of-semester cleanup.',
   '나': 'Me',
   '{{name}}의 스토리 {{count}}개': '{{name}}: {{count}} stories',
   '{{name}}의 출석 스토리': '{{name}}’s attendance story',
