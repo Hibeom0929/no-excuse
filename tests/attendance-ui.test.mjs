@@ -22,8 +22,9 @@ const modules = {
   '../lib/store': { useStore: () => ({ data, processAutoAbsences: async () => {} }) },
   '../lib/i18n': { useLanguage: () => ({ language: 'ko', t: translate }) },
   './StampButton': { CheckInStamp: () => null, StampMark: () => null },
-  './ExcuseModal': { default: () => null },
-  './MemberHistory': { default: () => null },
+  './ExcuseModal': { __esModule: true, default: () => null },
+  './MemberHistory': { __esModule: true, default: () => null },
+  './AttendanceStories': { __esModule: true, default: () => null },
   '../lib/currency': { formatMoney: () => '' },
 }
 function load(path) {

@@ -1,0 +1,6 @@
+project_id = "no-excuse"
+
+[functions.cleanup-attendance-stories]
+# Custom 72-character scheduler secret is checked by the function. Not public
+# access: absent or incorrect credentials always return 401 before any deletion.
+verify_jwt = false

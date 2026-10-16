@@ -43,7 +43,6 @@ export function mapAttendance(row: any): AttendanceRecord {
     date: row.date,
     status: row.status,
     checkedInAt: row.checked_in_at ?? undefined,
-    photo: row.photo ?? undefined,
   }
 }
 

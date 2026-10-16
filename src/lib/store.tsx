@@ -10,6 +10,7 @@ import { useLanguage } from './i18n'
 import { todayDateStr, nowHHMM, hasClassEnded } from './time'
 import { submitExcuse, voteOnExcuse } from './excuseActions'
 import { entriesForDay } from './attendanceView'
+import { checkInWithStory } from './stories'
 
 const EMPTY: AppData = { groups: [], timetable: [], attendance: [], fines: [], excuses: [] }
 
@@ -170,13 +171,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [refreshAll])
 
   const checkIn = useCallback(async (entry: TimetableEntry, photo?: string) => {
-    if (!meId) return
-    const date = todayDateStr()
-    const { error } = await supabase.from('attendance_records').insert({
-      group_id: entry.groupId, member_id: entry.memberId, timetable_entry_id: entry.id,
-      date, status: 'present', checked_in_at: new Date().toISOString(), photo: photo ?? null,
-    })
-    if (error && !error.message.toLowerCase().includes('duplicate')) throw new Error(error.message)
+    if (!meId) throw new Error('로그인이 필요해요')
+    await checkInWithStory(supabase, entry.id, entry.groupId, meId, todayDateStr(), photo)
     await refreshAll()
   }, [meId, refreshAll])
 

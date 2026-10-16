@@ -8,6 +8,7 @@ import { CheckInStamp, StampMark } from './StampButton'
 import ExcuseModal from './ExcuseModal'
 import MemberHistory from './MemberHistory'
 import { useLanguage } from '../lib/i18n'
+import AttendanceStories from './AttendanceStories'
 
 export default function TodayAttendance({ group, meId }: { group: Group; meId: string }) {
   const { data, checkIn, cancelCheckIn, processAutoAbsences } = useStore()
@@ -59,6 +60,7 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
 
   return (
     <div className="space-y-6">
+      <AttendanceStories key={`${group.id}:${meId}`} group={group} meId={meId} records={data.attendance} />
       <div>
         <h2 className="text-xs font-bold text-ink/50 mb-3 tracking-wide">
           {t('오늘 · {{weekday}} · {{time}}', { weekday: weekdayLabel(wd, language), time: now })}
@@ -98,7 +100,7 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
                   {!record && canCheckIn && (
                     <div className="mt-3">
                       <CheckInStamp
-                        onConfirm={photo => checkIn(entry, photo).catch(e => alert(e instanceof Error ? e.message : t('체크인에 실패했어요')))}
+                        onConfirm={photo => checkIn(entry, photo)}
                         requirePhoto={group.requirePhotoToCheckIn}
                       />
                     </div>

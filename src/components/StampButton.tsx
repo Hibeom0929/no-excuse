@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { compressImageFile } from '../lib/image'
 import { useLanguage } from '../lib/i18n'
 
@@ -19,7 +19,7 @@ export function StampMark({ kind }: { kind: 'present' | 'absent' | 'excused' }) 
 export function CheckInStamp({
   onConfirm, requirePhoto,
 }: {
-  onConfirm: (photo?: string) => void
+  onConfirm: (photo?: string) => void | Promise<void>
   requirePhoto: boolean
 }) {
   const { t } = useLanguage()
@@ -27,6 +27,8 @@ export function CheckInStamp({
   const [stamped, setStamped] = useState(false)
   const [loadingPhoto, setLoadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
 
   const handleFile = async (file?: File) => {
     if (!file) return
@@ -52,7 +54,7 @@ export function CheckInStamp({
     )
   }
 
-  const canConfirm = (!requirePhoto || !!photo) && !loadingPhoto
+  const canConfirm = (!requirePhoto || !!photo) && !loadingPhoto && !submitting
 
   return (
     <div className="space-y-1.5">
@@ -64,18 +66,25 @@ export function CheckInStamp({
           requirePhoto && !photo ? 'border-gold text-gold' : 'border-line text-ink/50 hover:border-campus/40'
         }`}>
           {loadingPhoto ? t('처리중...') : t('📷 인증샷{{required}}', { required: requirePhoto ? t(' (필수)') : '' })}
-          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={loadingPhoto}
+          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={loadingPhoto || submitting}
             onChange={e => handleFile(e.target.files?.[0])} />
         </label>
         <button
-          onClick={() => { if (!canConfirm) return; setStamped(true); onConfirm(photo) }}
+          onClick={async () => {
+            if (!canConfirm || submittingRef.current) return
+            submittingRef.current = true; setSubmitting(true); setPhotoError(null)
+            try { await onConfirm(photo); setStamped(true) }
+            catch (err) { setPhotoError(t(err instanceof Error ? err.message : '체크인에 실패했어요')) }
+            finally { submittingRef.current = false; setSubmitting(false) }
+          }}
           disabled={!canConfirm}
           className="flex-1 bg-campus text-paper font-bold text-sm rounded-lg py-2.5 hover:bg-campusLight transition-colors disabled:bg-line disabled:text-ink/30 disabled:cursor-not-allowed"
         >
-          {loadingPhoto ? t('사진 처리중...') : t('출석 도장 찍기')}
+          {submitting ? t('처리중...') : loadingPhoto ? t('사진 처리중...') : t('출석 도장 찍기')}
         </button>
       </div>
-      {photoError && <p className="text-[11px] text-stamp">{photoError}</p>}
+      <p className="text-[11px] text-ink/40">{t('사진을 첨부하면 팀 스토리에 공유돼요.')}</p>
+      {photoError && <p role="alert" className="text-[11px] text-stamp">{photoError}</p>}
     </div>
   )
 }

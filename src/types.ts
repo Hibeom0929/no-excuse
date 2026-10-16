@@ -51,7 +51,6 @@ export interface AttendanceRecord {
   date: string // yyyy-mm-dd
   status: AttendanceStatus
   checkedInAt?: string
-  photo?: string // dataURL
 }
 
 export interface FineTransaction {

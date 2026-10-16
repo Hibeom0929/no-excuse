@@ -42,3 +42,17 @@ test('successful empty history remains a legitimate complete snapshot', async ()
   assert.equal(data.attendance.length, 0)
   assert.equal(data.excuses.length, 1)
 })
+
+test('attendance metadata refresh never selects base64 photos', async () => {
+  const original = clientWithFailure()
+  let projection
+  const wrapped = { from(table) {
+    const builder = original.from(table)
+    const select = builder.select
+    builder.select = value => { if (table === 'attendance_records') projection = value; return select(value) }
+    return builder
+  } }
+  await loadAppData(wrapped, 'me')
+  assert.ok(projection.includes('checked_in_at'))
+  assert.doesNotMatch(projection, /\*|photo/)
+})

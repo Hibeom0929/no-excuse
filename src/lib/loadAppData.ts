@@ -19,7 +19,8 @@ export async function loadAppData(client: SupabaseClient, meId: string): Promise
     client.from('groups').select('*').in('id', groupIds),
     client.from('group_members').select('group_id, member_id, left_at, profiles ( id, name )').in('group_id', groupIds),
     client.from('timetable_entries').select('*').in('group_id', groupIds),
-    client.from('attendance_records').select('*').in('group_id', groupIds),
+    // Photos are downloaded only when a story is opened, never on every sync.
+    client.from('attendance_records').select('id,group_id,member_id,timetable_entry_id,date,status,checked_in_at').in('group_id', groupIds),
     client.from('fine_transactions').select('*').in('group_id', groupIds),
     client.from('excuse_requests').select('*').in('group_id', groupIds).is('superseded_by', null),
   ])).map(result => rows(result))
