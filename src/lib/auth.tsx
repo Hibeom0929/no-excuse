@@ -3,6 +3,7 @@ import { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { Profile, loadMyProfile, saveMyProfileName } from './profile'
 import { validateEmail } from './email'
+import { disableDevicePush, setPushWorkerState } from './push'
 export type { Profile } from './profile'
 
 interface AuthCtx {
@@ -37,6 +38,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.hash.includes('type=recovery')
     || new URLSearchParams(window.location.search).get('type') === 'recovery'
   ))
+  useEffect(() => {
+    let active = true
+    if (!initializing && 'serviceWorker' in navigator && 'PushManager' in window) {
+      // Any account transition starts suppressed; only that account's loaded
+      // preference can re-enable it. Cancel delayed writes from a prior session.
+      void setPushWorkerState(userId, false, () => active).catch(() => {})
+    }
+    return () => { active = false }
+  }, [userId, initializing])
 
   useEffect(() => {
     let active = true
@@ -109,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.updateUser({ password })
     if (!error) {
       setPasswordRecovery(false)
+      await disableDevicePush().catch(() => {})
       await supabase.auth.signOut()
     }
     return { error: error?.message }
@@ -127,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session])
 
   const signOut = useCallback(async () => {
+    await disableDevicePush().catch(() => {})
     await supabase.auth.signOut()
   }, [])
 

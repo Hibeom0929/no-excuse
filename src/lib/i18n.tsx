@@ -4,6 +4,21 @@ export type Language = 'ko' | 'en'
 type Variables = Record<string, string | number>
 
 const EN: Record<string, string> = {
+  '출석 알림': 'Attendance reminders',
+  '이 기기의 출석 알림': 'Attendance reminders on this device',
+  '수업 시작 시 아직 출석하지 않았다면 한 번 알려드려요.': 'One reminder at class start if you have not checked in.',
+  '이 기기에서만 적용 · 싱가포르 시간 기준 · 잠금화면에 수업명이 표시될 수 있어요.': 'This device only · Singapore time · Class names may appear on your lock screen.',
+  'iPhone에서는 홈 화면에 추가한 No Excuse를 열어 알림을 켜주세요.': 'On iPhone, open No Excuse from your Home Screen to enable notifications.',
+  '이 브라우저에서는 푸시 알림을 지원하지 않아요.': 'This browser does not support push notifications.',
+  '기기 설정에서 No Excuse 알림을 허용해주세요.': 'Allow No Excuse notifications in your device settings.',
+  '알림 서버를 준비 중이에요. 잠시 후 다시 시도해주세요.': 'The reminder server is not ready yet. Please try again shortly.',
+  '알림 서버를 확인하지 못했어요. 다시 시도해주세요.': 'Could not reach the reminder server. Please try again.',
+  '알림 설정을 불러오지 못했어요.': 'Could not load notification settings.',
+  '알림 설정을 저장하지 못했어요. 다시 시도해주세요.': 'Could not save notification settings. Please try again.',
+  '앱을 완전히 닫았다가 다시 열고 시도해주세요.': 'Close the app completely, reopen it, and try again.',
+  '확인 중...': 'Checking...',
+  '켜짐': 'On',
+  '꺼짐': 'Off',
   '불러오는 중...': 'Loading...',
   '프로필을 불러오지 못했어요. 다시 시도해주세요.': 'Could not load your profile. Please try again.',
   '프로필을 저장하지 못했어요. 다시 시도해주세요.': 'Could not save your profile. Please try again.',

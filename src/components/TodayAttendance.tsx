@@ -9,6 +9,7 @@ import ExcuseModal from './ExcuseModal'
 import MemberHistory from './MemberHistory'
 import { useLanguage } from '../lib/i18n'
 import AttendanceStories from './AttendanceStories'
+import { pushRoute } from '../lib/push'
 
 export default function TodayAttendance({ group, meId }: { group: Group; meId: string }) {
   const { data, checkIn, cancelCheckIn, processAutoAbsences } = useStore()
@@ -39,6 +40,12 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
   const now = nowHHMM(clock)
 
   const myEntries = entriesForDay(data.timetable, group.id, date, meId)
+  useEffect(() => {
+    const target = pushRoute(window.location.search)
+    if (target?.groupId === group.id && myEntries.some(entry => entry.id === target.entryId)) {
+      document.getElementById(`attendance-entry-${target.entryId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [group.id, data.timetable, date, meId])
 
   const findRecord = (entryId: string) =>
     data.attendance.find(a => a.groupId === group.id && a.timetableEntryId === entryId && a.date === date)
@@ -77,7 +84,7 @@ export default function TodayAttendance({ group, meId }: { group: Group; meId: s
               const canCheckIn = !record && isWithinCheckInWindow(entry.startTime, entry.endTime, now)
               const ended = hasClassEnded(entry.endTime, now)
               return (
-                <div key={entry.id} className="bg-white border border-line rounded-xl p-4 shadow-card">
+                <div key={entry.id} id={`attendance-entry-${entry.id}`} className="bg-white border border-line rounded-xl p-4 shadow-card scroll-mt-40">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-bold text-ink">{entry.subject}</div>

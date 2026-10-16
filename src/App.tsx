@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
-import { StoreProvider } from './lib/store'
+import { StoreProvider, useStore } from './lib/store'
 import Login from './components/Login'
 import Onboarding from './components/Onboarding'
 import GroupHome from './components/GroupHome'
@@ -10,13 +10,35 @@ import InstallAppPrompt from './components/InstallAppPrompt'
 import LanguageToggle from './components/LanguageToggle'
 import PasswordRecovery from './components/PasswordRecovery'
 import { LanguageProvider, useLanguage } from './lib/i18n'
+import NotificationSettings from './components/NotificationSettings'
+import { pushRoute, validPushId } from './lib/push'
 
 function Shell() {
-  const [groupId, setGroupId] = useState<string | null>(null)
+  const [groupId, setGroupId] = useState<string | null>(() => pushRoute(window.location.search)?.groupId ?? null)
+  const [routeVersion, setRouteVersion] = useState(0)
+  const { loading } = useStore()
+  useEffect(() => {
+    const open = (event: MessageEvent) => {
+      if (event.data?.type !== 'NO_EXCUSE_OPEN_CLASS' || !validPushId(event.data.groupId) || !validPushId(event.data.entryId)) return
+      const target = new URL(window.location.href)
+      target.searchParams.set('group', event.data.groupId); target.searchParams.set('entry', event.data.entryId)
+      window.history.replaceState(null, '', target)
+      setGroupId(event.data.groupId); setRouteVersion(value => value + 1)
+    }
+    navigator.serviceWorker?.addEventListener('message', open)
+    return () => navigator.serviceWorker?.removeEventListener('message', open)
+  }, [])
+  const select = (next: string | null) => {
+    const target = new URL(window.location.href)
+    target.searchParams.delete('group'); target.searchParams.delete('entry')
+    window.history.replaceState(null, '', target)
+    setGroupId(next)
+  }
+  if (loading) return <LoadingScreen />
 
   return groupId
-    ? <GroupDashboard groupId={groupId} onBack={() => setGroupId(null)} />
-    : <GroupHome onSelect={setGroupId} />
+    ? <GroupDashboard key={`${groupId}:${routeVersion}`} groupId={groupId} onBack={() => select(null)} />
+    : <GroupHome onSelect={select} />
 }
 
 function LoadingScreen() {
@@ -62,6 +84,7 @@ function Gate() {
   return (
     <StoreProvider key={session.user.id}>
       <TopBar />
+      <NotificationSettings />
       <Shell />
     </StoreProvider>
   )

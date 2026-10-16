@@ -4,3 +4,6 @@ project_id = "no-excuse"
 # Cleanup is disabled in semester-archive mode. Keep gateway authentication on;
 # no scheduler credential or permanent deletion job is needed for stories.
 verify_jwt = true
+
+[functions.send-attendance-reminders]
+verify_jwt = true
