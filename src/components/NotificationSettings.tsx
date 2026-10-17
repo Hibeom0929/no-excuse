@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { useLanguage } from '../lib/i18n'
-import { disableDevicePush, enableDevicePush, pushRegistration, pushRpc, pushSupport, setPushWorkerState } from '../lib/push'
+import { devicePushSubscription, disableDevicePush, enableDevicePush, pushRegistration, pushRpc, pushSupport, setPushWorkerState } from '../lib/push'
 
 export default function NotificationSettings() {
   const { profile } = useAuth()
@@ -27,7 +27,7 @@ export default function NotificationSettings() {
       const { data: config, error: configError } = await pushRpc('get_push_public_config')
       if (configError) throw new Error('알림 서버를 확인하지 못했어요. 다시 시도해주세요.')
       const registration = await pushRegistration()
-      const subscription = await registration.pushManager.getSubscription()
+      const subscription = await devicePushSubscription(registration)
       let active = false
       if (subscription && Notification.permission === 'granted') {
         const { data, error: statusError } = await pushRpc('get_push_subscription_status', { p_endpoint: subscription.endpoint })

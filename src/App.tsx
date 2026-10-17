@@ -10,8 +10,8 @@ import InstallAppPrompt from './components/InstallAppPrompt'
 import LanguageToggle from './components/LanguageToggle'
 import PasswordRecovery from './components/PasswordRecovery'
 import { LanguageProvider, useLanguage } from './lib/i18n'
-import NotificationSettings from './components/NotificationSettings'
-import { pushRoute, validPushId } from './lib/push'
+import NotificationPanel from './components/NotificationPanel'
+import { listenForPushNavigation, pushRoute, validPushId } from './lib/push'
 
 function Shell() {
   const [groupId, setGroupId] = useState<string | null>(() => pushRoute(window.location.search)?.groupId ?? null)
@@ -25,8 +25,7 @@ function Shell() {
       window.history.replaceState(null, '', target)
       setGroupId(event.data.groupId); setRouteVersion(value => value + 1)
     }
-    navigator.serviceWorker?.addEventListener('message', open)
-    return () => navigator.serviceWorker?.removeEventListener('message', open)
+    return listenForPushNavigation(open)
   }, [])
   const select = (next: string | null) => {
     const target = new URL(window.location.href)
@@ -84,7 +83,7 @@ function Gate() {
   return (
     <StoreProvider key={session.user.id}>
       <TopBar />
-      <NotificationSettings />
+      <NotificationPanel />
       <Shell />
     </StoreProvider>
   )

@@ -4,6 +4,8 @@ export type Language = 'ko' | 'en'
 type Variables = Record<string, string | number>
 
 const EN: Record<string, string> = {
+  '알림 처리가 지연되고 있어요. 잠시 후 다시 시도해주세요.': 'Notification setup is taking too long. Please try again shortly.',
+  '출석 알림을 표시하지 못했어요. 출석 기능은 계속 사용할 수 있어요.': 'Could not display notification settings. You can still check in to class.',
   '출석 알림': 'Attendance reminders',
   '이 기기의 출석 알림': 'Attendance reminders on this device',
   '수업 시작 시 아직 출석하지 않았다면 한 번 알려드려요.': 'One reminder at class start if you have not checked in.',

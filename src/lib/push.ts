@@ -1,11 +1,36 @@
 import { supabase } from './supabase'
 
 export const PUSH_TIMEOUT_MS = 12000
-export async function pushRpc(name: string, args?: Record<string, unknown>) {
+const pushTimeoutError = () => new Error('알림 처리가 지연되고 있어요. 잠시 후 다시 시도해주세요.')
+
+// Browser Push APIs cannot be aborted. Stop waiting, and never let a late
+// subscribe result continue into a server opt-in after this operation failed.
+export async function pushWithTimeout<T>(operation: PromiseLike<T>, milliseconds = PUSH_TIMEOUT_MS, onTimeout?: () => void): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout>
+  try {
+    return await Promise.race([Promise.resolve(operation), new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => { onTimeout?.(); reject(pushTimeoutError()) }, milliseconds)
+    })])
+  } finally { clearTimeout(timeout!) }
+}
+
+export async function pushRpc(name: string, args?: Record<string, unknown>, milliseconds = PUSH_TIMEOUT_MS) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), PUSH_TIMEOUT_MS)
-  try { return await supabase.rpc(name, args).abortSignal(controller.signal) }
-  finally { clearTimeout(timeout) }
+  return pushWithTimeout(supabase.rpc(name, args).abortSignal(controller.signal), milliseconds, () => controller.abort())
+}
+
+export function devicePushSubscription(registration: ServiceWorkerRegistration) {
+  return pushWithTimeout(registration.pushManager.getSubscription())
+}
+
+export function listenForPushNavigation(listener: (event: MessageEvent) => void): () => void {
+  // Some environments expose the property but refuse access. Navigation via
+  // push is optional; its listener must never take down ordinary attendance.
+  try {
+    const worker = navigator.serviceWorker
+    worker?.addEventListener('message', listener)
+    return () => { try { worker?.removeEventListener('message', listener) } catch { /* optional listener */ } }
+  } catch { return () => {} }
 }
 export const validPushId = (value: unknown): value is string => typeof value === 'string'
   && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
@@ -19,7 +44,8 @@ export function pushRoute(search: string): { groupId: string; entryId: string } 
 export function pushSupport(): 'supported' | 'install' | 'unsupported' {
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  const installed = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true
+  const installed = (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches)
+    || (navigator as any).standalone === true
   if (ios && !installed) return 'install'
   return window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
     ? 'supported' : 'unsupported'
@@ -48,7 +74,8 @@ export async function setPushWorkerState(memberId: string | null, enabled: boole
       if (event.data?.ok) resolve()
       else reject(new Error('알림 설정을 저장하지 못했어요. 다시 시도해주세요.'))
     }
-    registration.active!.postMessage({ type: 'NO_EXCUSE_PUSH_STATE', memberId, enabled }, [channel.port2])
+    try { registration.active!.postMessage({ type: 'NO_EXCUSE_PUSH_STATE', memberId, enabled }, [channel.port2]) }
+    catch (error) { clearTimeout(timeout); channel.port1.close(); reject(error) }
   })
 }
 
@@ -59,16 +86,16 @@ export function pushServerKey(publicKey: string): Uint8Array<ArrayBuffer> {
 
 export async function enableDevicePush(memberId: string, publicKey: string | null, language: string, isCurrent = () => true): Promise<void> {
   // Keep this first: iOS requires the permission prompt in the click gesture.
-  const permission = await Notification.requestPermission()
+  const permission = await pushWithTimeout(Notification.requestPermission())
   if (permission !== 'granted') throw new Error('기기 설정에서 No Excuse 알림을 허용해주세요.')
   if (!isCurrent()) return
   if (!publicKey) throw new Error('알림 서버를 준비 중이에요. 잠시 후 다시 시도해주세요.')
   const registration = await pushRegistration()
-  let subscription = await registration.pushManager.getSubscription()
+  let subscription = await devicePushSubscription(registration)
   if (!isCurrent()) return
-  if (!subscription) subscription = await registration.pushManager.subscribe({
+  if (!subscription) subscription = await pushWithTimeout(registration.pushManager.subscribe({
     userVisibleOnly: true, applicationServerKey: pushServerKey(publicKey),
-  })
+  }))
   if (!isCurrent()) return
   await setPushWorkerState(memberId, true, isCurrent)
   if (!isCurrent()) { await setPushWorkerState(null, false).catch(() => {}); return }
@@ -87,16 +114,26 @@ export async function enableDevicePush(memberId: string, publicKey: string | nul
 
 export async function disableDevicePush(): Promise<void> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  // One total budget, rather than stacking several 12-second waits on logout.
+  const deadline = Date.now() + PUSH_TIMEOUT_MS
+  const remaining = () => {
+    const value = deadline - Date.now()
+    if (value <= 0) throw pushTimeoutError()
+    return value
+  }
   // Local suppression first: protects logout even when the network is offline.
-  await setPushWorkerState(null, false).catch(() => {})
-  const registration = await pushRegistration().catch(() => null)
-  const subscription = await registration?.pushManager.getSubscription()
+  await pushWithTimeout(setPushWorkerState(null, false, () => Date.now() < deadline), remaining()).catch(() => {})
+  const registration = await pushWithTimeout(pushRegistration(), remaining())
+  const subscription = await pushWithTimeout(registration.pushManager.getSubscription(), remaining())
   if (!subscription) return
-  let serverError: unknown
-  try {
-    const { error } = await pushRpc('disable_push_subscription', { p_endpoint: subscription.endpoint })
-    if (error) serverError = error
-  } catch (error) { serverError = error }
-  const removed = await subscription.unsubscribe().catch(() => false)
-  if (serverError && !removed) throw new Error('알림 설정을 저장하지 못했어요. 다시 시도해주세요.')
+  const budget = remaining()
+  // Both paths begin with the old authenticated session and are independently
+  // bounded. A stuck browser must not prevent the server opt-out, or vice versa.
+  const [saved, removed] = await Promise.allSettled([
+    pushRpc('disable_push_subscription', { p_endpoint: subscription.endpoint }, budget),
+    pushWithTimeout(Promise.resolve().then(() => subscription.unsubscribe()), budget),
+  ])
+  const serverDisabled = saved.status === 'fulfilled' && !saved.value.error
+  const browserDisabled = removed.status === 'fulfilled' && removed.value
+  if (!serverDisabled && !browserDisabled) throw new Error('알림 설정을 저장하지 못했어요. 다시 시도해주세요.')
 }

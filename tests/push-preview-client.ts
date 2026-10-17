@@ -2,9 +2,13 @@
 let enabled = false
 const mode = new URLSearchParams(location.search).get('mode')
 export const useAuth = () => ({ profile: { id: '00000000-0000-4000-8000-000000000001' } })
-export const pushSupport = () => mode === 'install' ? 'install' : mode === 'unsupported' ? 'unsupported' : 'supported'
+export const pushSupport = () => {
+  if (mode === 'crash') throw new Error('Local notification-only render failure')
+  return mode === 'install' ? 'install' : mode === 'unsupported' ? 'unsupported' : 'supported'
+}
 export const setPushWorkerState = async () => {}
 export const pushRegistration = async () => ({ pushManager: { getSubscription: async () => ({ endpoint: 'local-fixture-only' }) } })
+export const devicePushSubscription = async () => ({ endpoint: 'local-fixture-only' })
 export const enableDevicePush = async () => { enabled = true }
 export const disableDevicePush = async () => { enabled = false }
 export const supabase = { rpc: async (name: string) => {
