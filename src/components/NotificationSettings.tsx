@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { useLanguage } from '../lib/i18n'
 import { devicePushSubscription, disableDevicePush, enableDevicePush, pushRegistration, pushRpc, pushSupport, setPushWorkerState } from '../lib/push'
+import NotificationDisclosure from './NotificationDisclosure'
 
 export default function NotificationSettings() {
   const { profile } = useAuth()
@@ -75,11 +76,11 @@ export default function NotificationSettings() {
     finally { busyRef.current = false; setBusy(false) }
   }
 
-  return <section className="max-w-xl mx-auto px-5 mt-4" aria-label={t('출석 알림')}>
-    <div className="rounded-xl border border-line bg-white px-4 py-3">
+  const status = error ? t('확인 필요') : support !== 'supported' ? undefined
+    : busy ? t('확인 중...') : enabled ? t('켜짐') : t('꺼짐')
+  return <NotificationDisclosure title={t('출석 알림')} status={status} attention={!!error}>
       <div className="flex items-center justify-between gap-3">
-        <div><h2 className="text-sm font-bold">{t('출석 알림')}</h2>
-          <p className="text-[11px] text-ink/60 mt-1">{t('수업 시작 시 아직 출석하지 않았다면 한 번 알려드려요.')}</p></div>
+        <p className="text-xs text-ink/60">{t('수업 시작 시 아직 출석하지 않았다면 한 번 알려드려요.')}</p>
         {support === 'supported' && <button type="button" role="switch" aria-checked={enabled} aria-label={t('이 기기의 출석 알림')}
           disabled={busy || (!enabled && !publicKey)} onClick={() => void toggle()}
           className={`shrink-0 rounded-full min-h-11 px-4 text-xs font-bold disabled:opacity-40 ${enabled ? 'bg-campus text-paper' : 'bg-paper text-ink/60 border border-line'}`}>
@@ -92,6 +93,5 @@ export default function NotificationSettings() {
       {support === 'supported' && !busy && !publicKey && !error && <p role="status" className="text-xs text-ink/60 mt-2">{t('알림 서버를 준비 중이에요. 잠시 후 다시 시도해주세요.')}</p>}
       {error && <p role="alert" className="text-xs text-stamp mt-2">{t(error)}</p>}
       {support === 'supported' && (error || !publicKey) && !busy && <button type="button" onClick={() => void refresh()} className="text-xs underline mt-2 min-h-11">{t('다시 시도')}</button>}
-    </div>
-  </section>
+  </NotificationDisclosure>
 }

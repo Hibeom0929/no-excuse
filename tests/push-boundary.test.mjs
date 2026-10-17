@@ -10,8 +10,13 @@ const compiled = ts.transpileModule(readFileSync(new URL('../src/components/Noti
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true },
 }).outputText
 const exports = {}, states = [], logs = []
+const disclosure = {}
+vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../src/components/NotificationDisclosure.tsx', import.meta.url), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true },
+}).outputText, { exports: disclosure, require: () => React })
 vm.runInNewContext(compiled, { exports, require: name => ({
   react: React, './NotificationSettings': { default: () => React.createElement('span', null, 'Notification settings') },
+  './NotificationDisclosure': disclosure,
   '../lib/i18n': { useLanguage: () => ({ t: value => value }) },
   '../lib/push': { setPushWorkerState: async (...args) => { states.push(args) } },
 })[name], console: { warn: value => logs.push(value) } })
@@ -27,12 +32,22 @@ test('notification failure has a local retry screen and leaves attendance siblin
   assert.match(html, /출석 기능은 계속 사용할 수 있어요/)
   assert.match(html, /다시 시도/)
   assert.match(html, /출석 도장 찍기/)
+  assert.match(html, /<details/)
+  assert.doesNotMatch(html, /<details[^>]*\bopen(?:=|\s|>)/)
   assert.doesNotMatch(html, /Notification settings|private failure/)
   assert.deepEqual(states.at(-1), [null, false])
   assert.equal(logs.includes('private failure'), false)
   boundary.setState = update => { boundary.state = { ...boundary.state, ...update } }
   fallback.props.retry()
   assert.equal(boundary.render(), child)
+})
+test('notification details are collapsed by default; compact summary keeps the state and keyboard-native disclosure', () => {
+  const html = renderToStaticMarkup(React.createElement(disclosure.default,
+    { title: '출석 알림', status: '꺼짐' }, React.createElement('p', null, '기기 및 잠금화면 안내')))
+  assert.match(html, /<summary[^>]*>.*출석 알림.*꺼짐.*<\/summary>/)
+  assert.match(html, /기기 및 잠금화면 안내/)
+  assert.match(html, /aria-hidden="true"/)
+  assert.doesNotMatch(html, /<details[^>]*\bopen(?:=|\s|>)/)
 })
 test('main app and local preview use the isolated panel, not bare notification settings', () => {
   for (const path of ['../src/App.tsx', './push-preview.tsx']) {
