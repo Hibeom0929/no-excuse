@@ -85,6 +85,7 @@ npm run preview
 3. **반드시** `20261016020000_semester_photo_archive.sql`을 프론트엔드 배포 전에 적용합니다. 24시간 파일 삭제 후보 조회와 정리 함수를 무동작으로 바꾸고, 구버전 사진을 비공개 테이블에 분리합니다. 기존 24시간 정리 서버가 호출돼도 파일/출석/사진 본문을 지우지 못합니다. 정리 함수 소스도 삭제 없는 409 응답으로 변경했고 `verify_jwt=true`를 유지합니다. 스토리 운영에는 이 Edge Function 배포나 스케줄 설정이 필요 없습니다.
 4. `supabase/tests/attendance_stories.sql` 실행: 임시 데이터만 사용하며 전부 롤백합니다. SQL 테스트는 실제 사진 파일을 업로드·삭제하지 않습니다.
 5. 서버 설정 완료 후 프론트엔드를 배포합니다. `npm test`와 `npm run build`로 확인합니다.
+6. 기존 운영 프로젝트에는 `20261019000000_fix_story_upload_path.sql`도 적용합니다. 업로드 정책의 `name`이 그룹 이름으로 잘못 해석되는 문제와 `INSERT ... RETURNING`에서 새 파일 행을 확인하지 못하는 문제를 수정합니다. 본인·현재 그룹·업로드 대기 10분/공개 24시간 제한, 비공개 버킷, 기존 기록과 파일은 유지합니다. `tests/story-upload-database.test.mjs`는 격리된 PostgreSQL에서 실제 `authenticated` 역할의 업로드·출석 확정과 익명/타인/다른 그룹/만료 접근 차단을 검증합니다. 운영 DB에 테스트용 사진이나 출석을 만들지 않습니다.
 
 로컬 화면 시험: `npx vite --config tests/story-preview.vite.ts --host 127.0.0.1` 실행 후 `/tests/story-preview.html`을 엽니다. 가짜 데이터와 생성한 샘플 사진만 사용하며 실제 Supabase로 요청하지 않습니다. 사진 열람·여러 장 이동·만료·취소·조회 실패를 시험할 수 있습니다.
 
